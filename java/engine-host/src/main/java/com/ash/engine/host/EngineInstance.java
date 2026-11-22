@@ -14,7 +14,6 @@
  * See the LICENSE file in the root of this repository for the full terms.
  */
 package com.ash.engine;
-package com.ash.engine.host;
 
 import com.ash.engine.Control;
 import com.ash.engine.Engine;

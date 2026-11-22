@@ -14,7 +14,6 @@
  * See the LICENSE file in the root of this repository for the full terms.
  */
 package com.ash.engine;
-package com.ash.engine.tck;
 
 import com.ash.engine.Descriptor;
 import com.ash.engine.Engine;
