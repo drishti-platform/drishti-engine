@@ -71,6 +71,11 @@ public final class EngineLib implements AutoCloseable {
      * {@code enabled} switch. {@code host}: the loader of the platform classes.
      */
     public static EngineLib scan(Path folder, ClassLoader host, Provided provided, Map<String, Boolean> engineFiles) throws IOException {
+        return scan(folder, host, provided, engineFiles, Licence.ALL);
+    }
+
+    /** As {@link #scan(Path, ClassLoader, Provided, Map)}, with the installation's licence: an engine whose product it does not grant is blocked ({@code ENG-1014}). */
+    public static EngineLib scan(Path folder, ClassLoader host, Provided provided, Map<String, Boolean> engineFiles, Licence licence) throws IOException {
         List<EngineJar> jars = new ArrayList<>();
         if (Files.isDirectory(folder)) {
             try (Stream<Path> s = Files.list(folder)) {
@@ -98,7 +103,10 @@ public final class EngineLib implements AutoCloseable {
             }
             EngineJar j = o.getValue().get(0);
             EngineJar.Registered r = j.engines().stream().filter(x -> x.id().equals(id)).findFirst().orElseThrow();
-            if (!r.ok()) {
+            java.util.Optional<Problem> unlicensed = r.ok() ? licence.check(r.descriptor(), j.path().getFileName().toString()) : java.util.Optional.empty();
+            if (unlicensed.isPresent()) {
+                entries.put(id, new Entry(id, State.BLOCKED, unlicensed.get().words(), unlicensed.get().code(), r, j));
+            } else if (!r.ok()) {
                 entries.put(id, new Entry(id, State.BLOCKED, r.problems().get(0).words(), r.problems().get(0).code(), r, j));
             } else if (!engineFiles.containsKey(id)) {
                 entries.put(id, new Entry(id, State.NOT_CONFIGURED, id + " " + r.version() + " is installed (" + j.path().getFileName()

@@ -406,12 +406,12 @@ public final class Laws {
             out.add(Result.of("laws", c.name(), "pushdown", diff == null ? null : "grouped scans offered and refused: " + diff, base.hash()));
             return out;
         }
-        List<String> forcing = d.options().entrySet().stream().filter(e -> "bool".equals(e.getValue().type()) && e.getKey().startsWith("force-"))
-                .map(Map.Entry::getKey).toList();
-        if (forcing.isEmpty()) {
-            out.add(Result.fail("laws", c.name(), "pushdown", "a column is relative, so a bool option force-<…> must force the fixed-order path (section 8.1 rule 6)"));
+        String declared = d.exactPathOption();
+        if (declared == null) {
+            out.add(Result.fail("laws", c.name(), "pushdown", "a column is relative, so a bool option must declare forces: exact-path (section 8.1 rule 6)"));
             return out;
         }
+        List<String> forcing = List.of(declared);
         for (String f : forcing) {
             Map<String, Object> opts = new LinkedHashMap<>(c.given().options());
             opts.put(f, true);

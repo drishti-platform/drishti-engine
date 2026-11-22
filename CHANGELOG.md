@@ -19,4 +19,7 @@ and the specification's draft 3 (`spec/1/SPEC.md`).
   session pool, admission, the answer cache, coalescing, the engine-file template.
 - `engine-inputs-files` (rows in memory as a host delivers them; JSONL folders) and `engine-cli` (`engine run`, E5); the kit's inputs
   moved there (one way).
+- Rachana 1.0.0 (level 1.2) is the kit's EL oracle. Descriptors name their `product`; a host's `Licence` blocks an engine whose product
+  it does not grant (`ENG-1014`, one sentence), beside the version check; the format of the licence file stays pluggable. The exact-path
+  option is declared (`forces: exact-path`), and the kit's pushdown law reads the declaration. The specification copy here is amended.
 - Guards, launchers per the platform launcher standard, README, LICENSE.

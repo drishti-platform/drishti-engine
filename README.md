@@ -9,7 +9,7 @@ status: 0.1.0-SNAPSHOT, milestone E0/E1 of combined i8; engine-api 0.x until thr
 coordinates: {groupId: com.ash.engine, package: com.ash.engine (API), com.ash.engine.host, com.ash.engine.tck, bom: com.ash.engine:engine-bom}
 java: 21
 modules: [engine-api, engine-host, engine-inputs-files, engine-tck, engine-cli, engine-sample, engine-guards, engine-bom]
-depends-on: [engine-api the JDK only; engine-host engine-api; engine-tck drishti-tools 1.1.0 (tools-xlsx), Rachana 0.12.0 (rachana-core, the EL oracle), Apache POI (the spreadsheet oracle)]
+depends-on: [engine-api the JDK only; engine-host engine-api; engine-tck drishti-tools 1.1.0 (tools-xlsx), Rachana 1.0.0 (rachana-core at level 1.2, the EL oracle), Apache POI (the spreadsheet oracle)]
 commands: {build: "cd java && ./mvnw clean verify", kit: "java -jar engine-tck-<v>-cli.jar tck run --engine <jar> --cases <dir> --out <dir>"}
 consumers: [Drishti (the host, from H2), Drishti Risk (engine #1), drishti-engines (first-party engines, from M2)]
 specification: spec/1/SPEC.md
@@ -71,7 +71,7 @@ group but delivery on the class path.
 
 ## Writing an engine
 
-1. Write the descriptor at `src/main/resources/META-INF/drishti-engine/<id>.engine.yaml` (`api: "0.1"`; `platform:` for each family
+1. Write the descriptor at `src/main/resources/META-INF/drishti-engine/<id>.engine.yaml` (`product:` the product id a licence grants; `api: "0.1"`; `platform:` for each family
    library the JAR references).
 2. Implement `Engine` and `Session` (and a capability per need); register the class in
    `META-INF/services/com.ash.engine.Engine`. The constructor does no work; `descriptor()` is `Descriptors.of(MyEngine.class, "<id>")`.

@@ -6,6 +6,7 @@ version: 1.0.0
 title: Totals by group
 about: Item count, quantity and amount by group, read as the caller; grouped at the source when the host can, otherwise scanned.
 publisher: { id: com.ash.sample, name: Drishti Engine samples }
+product: drishti-engine-samples
 api: "0.1"
 platform: { tools: "1.1" }
 inputs:
@@ -20,6 +21,7 @@ options:
   force-fixed-order:
     type: bool
     default: false
+    forces: exact-path
     label: Force the fixed-order path
     help: Never use a grouped scan; sum each group in ID order, so the amount is the same bits wherever it runs.
 outputs:

@@ -6,6 +6,7 @@ version: 1.0.0
 title: Weighted mean
 about: The weighted mean of a value by group, from observations supplied under a contract.
 publisher: { id: com.ash.sample, name: Drishti Engine samples }
+product: drishti-engine-samples
 api: "0.1"
 platform: { tools: "1.1" }
 snapshot:

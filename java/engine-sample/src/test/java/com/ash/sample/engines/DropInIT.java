@@ -44,7 +44,7 @@ class DropInIT {
 
     @Test
     void anEmptyFolderStartsWithNoEngines(@TempDir Path lib) throws Exception {
-        try (EngineLib l = EngineLib.scan(lib, getClass().getClassLoader(), Provided.of("1.1", null, "0.12"), Map.of("wmean", true))) {
+        try (EngineLib l = EngineLib.scan(lib, getClass().getClassLoader(), Provided.of("1.1", null, "1.0"), Map.of("wmean", true))) {
             assertThat(l.entry("wmean").state()).isEqualTo(EngineLib.State.NOT_INSTALLED);
             assertThat(l.entry("wmean").words()).contains("no JAR");
         }
@@ -53,7 +53,7 @@ class DropInIT {
     @Test
     void aCopiedJarIsFoundAndBoundByItsEngineFile(@TempDir Path lib) throws Exception {
         Files.copy(JAR, lib.resolve("engine-sample-1.0.0.jar"));
-        try (EngineLib l = EngineLib.scan(lib, getClass().getClassLoader(), Provided.of("1.1", null, "0.12"), Map.of("wmean", true))) {
+        try (EngineLib l = EngineLib.scan(lib, getClass().getClassLoader(), Provided.of("1.1", null, "1.0"), Map.of("wmean", true))) {
             assertThat(l.entry("wmean").state()).isEqualTo(EngineLib.State.RUNNING);
             assertThat(l.entry("group-totals").state()).isEqualTo(EngineLib.State.NOT_CONFIGURED);
             assertThat(l.jars()).singleElement().satisfies(j -> {
@@ -69,7 +69,7 @@ class DropInIT {
     void twoJarsOfOneIdAreBothBlocked(@TempDir Path lib) throws Exception {
         Files.copy(JAR, lib.resolve("engine-sample-1.0.0.jar"));
         Files.copy(JAR, lib.resolve("engine-sample-copy.jar"));
-        try (EngineLib l = EngineLib.scan(lib, getClass().getClassLoader(), Provided.of("1.1", null, "0.12"), Map.of("wmean", true))) {
+        try (EngineLib l = EngineLib.scan(lib, getClass().getClassLoader(), Provided.of("1.1", null, "1.0"), Map.of("wmean", true))) {
             assertThat(l.entry("wmean").state()).isEqualTo(EngineLib.State.BLOCKED);
             assertThat(l.entry("wmean").code()).isEqualTo("ENG-1006");
             assertThat(l.entry("wmean").words()).contains("engine-sample-1.0.0.jar").contains("engine-sample-copy.jar");
@@ -79,7 +79,7 @@ class DropInIT {
     @Test
     void anApiTooNewIsRefusedWithBothVersionsAndWhatToDo(@TempDir Path lib) throws Exception {
         rewrite(JAR, lib.resolve("engine-sample-next.jar"), "wmean", "api: \"0.1\"", "api: \"0.9\"", null, null);
-        try (EngineLib l = EngineLib.scan(lib, getClass().getClassLoader(), Provided.of("1.1", null, "0.12"), Map.of("wmean", true, "group-totals", true))) {
+        try (EngineLib l = EngineLib.scan(lib, getClass().getClassLoader(), Provided.of("1.1", null, "1.0"), Map.of("wmean", true, "group-totals", true))) {
             EngineLib.Entry e = l.entry("wmean");
             assertThat(e.state()).isEqualTo(EngineLib.State.BLOCKED);
             assertThat(e.code()).isEqualTo("ENG-1002");
@@ -96,6 +96,17 @@ class DropInIT {
             assertThat(l.entry("wmean").state()).isEqualTo(EngineLib.State.BLOCKED);
             assertThat(l.entry("wmean").code()).isEqualTo("ENG-1005");
             assertThat(l.entry("wmean").words()).contains("needs drishti-tools 1.1; this host provides none");
+        }
+    }
+
+    @Test
+    void anEngineWhoseProductTheLicenceDoesNotGrantIsBlockedNamingTheProduct(@TempDir Path lib) throws Exception {
+        Files.copy(JAR, lib.resolve("engine-sample-1.0.0.jar"));
+        try (EngineLib l = EngineLib.scan(lib, getClass().getClassLoader(), Provided.of("1.1", null, "1.0"), Map.of("wmean", true),
+                com.ash.engine.host.Licence.of(java.util.Set.of("drishti-risk")))) {
+            assertThat(l.entry("wmean").state()).isEqualTo(EngineLib.State.BLOCKED);
+            assertThat(l.entry("wmean").code()).isEqualTo("ENG-1014");
+            assertThat(l.entry("wmean").words()).contains("the product drishti-engine-samples, which this installation's licence does not grant");
         }
     }
 

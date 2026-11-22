@@ -15,7 +15,7 @@
 -->
 # The Drishti engine specification, `engine: 1`
 
-**Status: draft 3 (2026-11-22). Nothing in it is built.** Draft 2 put the owner's acceptance test into the text: an engine is
+**Status: draft 3, amended 2026-11-22 in the drishti-engine repository (this copy is now the one that changes): `product` and the licence check (6.2, 17.8, `ENG-1014`), and the exact-path option declared by `forces: exact-path` (6.4 rule 9). The kit and the API of 0.1 implement it; the copy in Drishti's `docs/specs/` is superseded by this one.** Draft 2 put the owner's acceptance test into the text: an engine is
 built and proven with no host, delivered as one JAR, found by `ServiceLoader`, checked for compatibility and refused in words
 (section 17). Draft 3 widens the scope to every computation (the owner's direction of the same day): query, live, what-if and
 explain run on the same two interfaces, with the declarations and host methods of sections 2.1, 3.2, 5 and 8.8 added and no
@@ -475,6 +475,7 @@ not name the engine's class: the JAR's `META-INF/services/com.ash.engine.Engine`
 | `engine` | yes | the descriptor format: `1` |
 | `id`, `version`, `title`, `about` | yes | identity; `version` is semantic |
 | `publisher` | yes | `{ id, name }` |
+| `product` | yes | the product id the engine belongs to (a name: `drishti-risk`); a host's licence must grant it for the engine to start (`ENG-1014`, 17.8). Several engines of one JAR usually share it |
 | `api` | yes | the `major.minor` of `engine-api` the JAR was compiled against: `"1.4"` (17.5). DELETED: the range form of draft 1 |
 | `platform` | | `{ tools, lake, rachana }`: the `major.minor` of each family library the JAR references (17.5) |
 | `entry` | | **DELETED** (draft 2): the class is registered for `ServiceLoader` (17.2) |
@@ -538,7 +539,7 @@ handed through unchanged (a host masks it for a viewer who has that input column
   "$id": "urn:drishti:engine:1:descriptor",
   "type": "object",
   "additionalProperties": false,
-  "required": ["engine", "id", "version", "title", "about", "publisher", "api", "inputs", "outputs"],
+  "required": ["engine", "id", "version", "title", "about", "publisher", "product", "api", "inputs", "outputs"],
   "properties": {
     "engine": { "const": 1 },
     "id": { "$ref": "#/$defs/name" },
@@ -547,6 +548,7 @@ handed through unchanged (a host masks it for a viewer who has that input column
     "about": { "type": "string", "minLength": 1 },
     "publisher": { "type": "object", "additionalProperties": false, "required": ["id", "name"],
                    "properties": { "id": { "type": "string" }, "name": { "type": "string" } } },
+    "product": { "$ref": "#/$defs/name" },
     "api": { "$ref": "#/$defs/built" },
     "platform": { "type": "object", "additionalProperties": false, "properties": {
       "tools": { "$ref": "#/$defs/built" }, "lake": { "$ref": "#/$defs/built" }, "rachana": { "$ref": "#/$defs/built" } } },
@@ -592,13 +594,15 @@ handed through unchanged (a host masks it for a viewer who has that input column
       "default": {}, "required": { "type": "boolean" }, "min": { "type": "number" }, "max": { "type": "number" },
       "allowed": { "type": "array" }, "options": { "type": "array", "items": { "type": "string" } },
       "items": { "enum": ["text", "int", "number", "decimal", "bool", "date"] },
-      "fields": { "type": "object", "additionalProperties": { "$ref": "#/$defs/typed" } } },
+      "fields": { "type": "object", "additionalProperties": { "$ref": "#/$defs/typed" } },
+      "forces": { "const": "exact-path" } },
       "allOf": [
         { "if": { "properties": { "type": { "const": "enum" } } }, "then": { "required": ["options"] } },
         { "if": { "properties": { "type": { "const": "list" } } }, "then": { "required": ["items"] } },
         { "if": { "properties": { "type": { "const": "records" } } }, "then": { "required": ["fields"] } },
         { "if": { "properties": { "type": { "const": "document" } } }, "then": { "required": ["schema"] } },
-        { "if": { "properties": { "type": { "const": "table" } } }, "then": { "required": ["contract", "max-rows"] } } ] },
+        { "if": { "properties": { "type": { "const": "table" } } }, "then": { "required": ["contract", "max-rows"] } },
+        { "if": { "required": ["forces"] }, "then": { "properties": { "type": { "const": "bool" } } } } ] },
     "input": { "type": "object", "additionalProperties": false, "required": ["about"],
       "if": { "properties": { "open": { "const": true } }, "required": ["open"] },
       "then": { "required": ["mode"], "properties": { "mode": { "const": "request" } },
@@ -648,6 +652,9 @@ handed through unchanged (a host masks it for a viewer who has that input column
 7. A `table` parameter's `overlays` MUST name an input, and its `contract` MUST be that input's. A `document` or `table` type
    MUST NOT appear under `options`. [K]
 8. `progressive` MUST be listed when, and only when, some output's answer may be preceded by an interim one. [K]
+9. **The exact-path option.** When any `number` column declares `exact: relative:<x>`, exactly one option MUST declare
+   `forces: exact-path`; it is of type `bool`, and set `true` it makes every such column `bits` (8.1 rules 4 and 6). No option
+   declares it otherwise, and a parameter never does. The kit finds the option by this declaration and by nothing else. [K]
 
 ## 7. Lifecycle
 
@@ -710,7 +717,7 @@ A host MUST call `open` exactly once, MUST close every session before `close`, a
    have one form.
 6. A `number` measure made from floating-point states of a grouped scan (5.2 rule 6) MAY declare `exact: relative:<x>`, as
    rule 4 allows for a native library, and the engine MUST then offer an option that forces its own fixed-order path over
-   `scan`, under which the column is `bits`. Integer and `decimal` aggregates are exact on both paths. [K]
+   `scan`, under which the column is `bits`. In both rules the option is the one that declares `forces: exact-path` (6.4 rule 9). Integer and `decimal` aggregates are exact on both paths. [K]
 
 ### 8.2 Missing inputs
 
@@ -1016,6 +1023,7 @@ public final class EngineException extends Exception {
 | `ENG-1011` | REFUSED | the JAR's hash or version differs from the engine file's pin |
 | `ENG-1012` | REFUSED | trust is `pinned` and the engine file has no pin, or no certificate beside the JAR matches it |
 | `ENG-1013` | REFUSED | an option is unknown or outside what is allowed |
+| `ENG-1014` | REFUSED | the installation's licence does not grant the engine's `product` (the engine, its version and file, and the product, in the words) |
 | `ENG-2001` | REFUSED | an input name the descriptor does not declare |
 | `ENG-2003` | REFUSED | a column the input does not declare was asked for |
 | `ENG-2011` | REFUSED | a required input has no conforming kind |
@@ -1146,7 +1154,7 @@ is exact: all rows, in order, all listed columns; an unlisted column of the outp
 | `seed` | another seed | unchanged for outputs not `stochastic` |
 | `explain` | every measure cell | 8.3 rules 1, 2, 6, 7 |
 | `overlay` | for each `table` parameter with `overlays`: the input physically changed by the case's rows, asked without the parameter | yes (8.8 rule 1) |
-| `pushdown` | every grouped scan offered by the kit's own exact executor; and every one refused | yes, under each column's `exact`; and `bits` with the forcing option (8.1 rule 6) |
+| `pushdown` | every grouped scan offered by the kit's own exact executor; and every one refused | yes, under each column's `exact`; and `bits` with the option that declares `forces: exact-path` set `true` (6.4 rule 9, 8.1 rule 6) |
 | `interim` | a `Control` that ignores `interim` | the final answer unchanged (capability `progressive`) |
 | `isolation` | the case run per viewer: inputs read as the case's visibility, a session per signature | yes (8.6 rule 7) |
 
@@ -1658,3 +1666,12 @@ JARs signed the JDK's standard way. Nothing in this draft depends on it.
 2. Without a restart a host MUST support: the switch; closing and reopening an engine instance on the same JAR after its
    engine file changed; rebinding of inputs.
 3. A host MUST NOT load two versions of one engine id in one process.
+
+### 17.8 Licence (Drishti)
+
+An engine names its `product` in its descriptor (6.2). Whether it may start is the host's decision from the installation's licence,
+which lists the product ids it grants (and, later, optional limits). The check sits beside the version check of 17.5: an engine whose
+product the licence does not grant is `blocked` (`ENG-1014`) with one sentence that names the engine, its version and file, and the
+missing product, and nothing else is affected. The licence file's form and signing are designed with module licensing, so modules and
+engines share one licence file; until then a host plugs its reader in behind `com.ash.engine.host.Licence`, and the kit and the
+command line grant every product.

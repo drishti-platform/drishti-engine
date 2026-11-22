@@ -124,7 +124,7 @@ public final class Params {
                     if (!(v instanceof List<?> l)) {
                         throw new IllegalArgumentException("a list is expected");
                     }
-                    Descriptor.Typed item = new Descriptor.Typed(t.items(), null, null, null, null, null, null, null, null, false, null, null, null, null, null, null);
+                    Descriptor.Typed item = new Descriptor.Typed(t.items(), null, null, null, null, null, null, null, null, false, null, null, null, null, null, null, null);
                     List<Object> out = new ArrayList<>();
                     for (Object x : l) {
                         out.add(convert(what, item, x, d, code));

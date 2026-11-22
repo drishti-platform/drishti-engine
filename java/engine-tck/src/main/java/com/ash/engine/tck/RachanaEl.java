@@ -27,10 +27,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-/** Rachana Core's own evaluator: the oracle the kit checks explanation formulas and push-down expressions against. */
+/** Rachana Core's own evaluator at language level 1.2: the oracle the kit checks explanation formulas and push-down expressions against. */
 public final class RachanaEl implements ElOracle {
 
-    private final ElCompiler compiler = Rachana.core().compiler();
+    private final ElCompiler compiler = Rachana.at("1.2", null).compiler();
     private final Formats formats = Formats.defaults();
     private final Map<String, Expr> compiled = new ConcurrentHashMap<>();
 

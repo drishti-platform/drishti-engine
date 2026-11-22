@@ -23,10 +23,10 @@ import java.util.Set;
 
 /**
  * An engine's declaration ({@code META-INF/drishti-engine/<id>.engine.yaml}): the single source for binding, checks, generation and the
- * kit. Read with {@link Descriptors}. {@code raw} is the document as read (plain maps, lists and scalars), for hashing and for keys a
+ * kit. {@code product}: the product id a host's licence must grant for the engine to start. Read with {@link Descriptors}. {@code raw} is the document as read (plain maps, lists and scalars), for hashing and for keys a
  * host reads as data ({@code ui}).
  */
-public record Descriptor(int format, String id, String version, String title, String about, Publisher publisher, String api,
+public record Descriptor(int format, String id, String version, String title, String about, Publisher publisher, String product, String api,
         Map<String, String> platform, String worker, String codes, String licenceFeature, List<Dimension> snapshot,
         Map<String, Input> inputs, Map<String, Typed> options, Map<String, Typed> params, Map<String, Output> outputs,
         Set<String> capabilities, Partition partition, Map<String, Port> uses, Limits limits, Map<String, String> aliases,
@@ -45,7 +45,12 @@ public record Descriptor(int format, String id, String version, String title, St
     /** An option or parameter declaration (section 3.2). Absent keys are null. */
     public record Typed(String type, Map<String, Object> schema, String contract, Integer maxRows, String overlays, String label,
             String help, String unit, Object defaultValue, boolean required, Double min, Double max, List<Object> allowed,
-            List<String> options, String items, Map<String, Typed> fields) {
+            List<String> options, String items, Map<String, Typed> fields, String forces) {
+
+        /** True when this bool option forces the exact path ({@code forces: exact-path}, specification 8.1 rules 4 and 6). */
+        public boolean forcesExactPath() {
+            return "exact-path".equals(forces);
+        }
 
         /** True when it has a {@code label} or {@code help}. */
         public boolean hasWords() {
@@ -89,6 +94,11 @@ public record Descriptor(int format, String id, String version, String title, St
 
     /** Declared memory (fixed and per input row) and the cancel latency (default 1 s). */
     public record Limits(long fixedBytes, Map<String, Long> perRowBytes, Duration cancelLatency) {}
+
+    /** The option that forces the exact path, or null when the engine declares none. */
+    public String exactPathOption() {
+        return options.entrySet().stream().filter(e -> e.getValue().forcesExactPath()).map(Map.Entry::getKey).findFirst().orElse(null);
+    }
 
     /** True when the descriptor lists the capability. */
     public boolean has(String capability) {

@@ -29,6 +29,7 @@ class DescriptorsTest {
             title: A calculator
             about: Adds two numbers.
             publisher: { id: org.example, name: Example }
+            product: example-lab
             api: "0.1"
             inputs: {}
             params:

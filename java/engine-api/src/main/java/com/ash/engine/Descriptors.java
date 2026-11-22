@@ -151,7 +151,19 @@ public final class Descriptors {
                 out.add("options." + name + ": an option is never a " + t.type());
             }
         });
+        boolean relative = d.outputs().values().stream().flatMap(o -> o.columns().stream())
+                .anyMatch(c -> c.exact() != null && c.exact().startsWith("relative:"));
+        long forcing = d.options().values().stream().filter(Descriptor.Typed::forcesExactPath).count();
+        if (relative && forcing != 1) {
+            out.add("a column is exact to a relative tolerance, so exactly one bool option declares forces: exact-path (8.1 rules 4 and 6); there are " + forcing);
+        }
+        if (!relative && forcing > 0) {
+            out.add("an option declares forces: exact-path, but no column is exact to a relative tolerance");
+        }
         d.params().forEach((name, t) -> {
+            if ("exact-path".equals(t.forces())) {
+                out.add("params." + name + ": forces is an option's declaration, never a parameter's");
+            }
             if (!t.hasWords()) {
                 out.add("params." + name + " has no label or help");
             }
@@ -176,9 +188,9 @@ public final class Descriptors {
         }
 
         Descriptor descriptor() {
-            keys("", m, Set.of("engine", "id", "version", "title", "about", "publisher", "api", "platform", "worker", "codes", "licence",
+            keys("", m, Set.of("engine", "id", "version", "title", "about", "publisher", "product", "api", "platform", "worker", "codes", "licence",
                     "snapshot", "inputs", "options", "params", "outputs", "capabilities", "partition", "uses", "limits", "aliases", "ui", "entry"),
-                    "engine", "id", "version", "title", "about", "publisher", "api", "inputs", "outputs");
+                    "engine", "id", "version", "title", "about", "publisher", "product", "api", "inputs", "outputs");
             if (m.containsKey("entry")) {
                 throw bad("entry", "the key entry is deleted: the class is registered in META-INF/services/com.ash.engine.Engine");
             }
@@ -294,7 +306,7 @@ public final class Descriptors {
                 map("ui", m.get("ui"));
             }
             return new Descriptor(1, id, version, text("title", m.get("title")), text("about", m.get("about")),
-                    new Descriptor.Publisher(text("publisher.id", pub.get("id")), text("publisher.name", pub.get("name"))),
+                    new Descriptor.Publisher(text("publisher.id", pub.get("id")), text("publisher.name", pub.get("name"))), name("product", m.get("product")),
                     match("api", text("api", m.get("api")), BUILT, "major.minor such as \"1.0\" (quoted)"), Collections.unmodifiableMap(platform), worker, codes, licence,
                     List.copyOf(dims), Collections.unmodifiableMap(inputs), options, params, Collections.unmodifiableMap(outputs),
                     Collections.unmodifiableSet(caps), partition, Collections.unmodifiableMap(uses), limits, Collections.unmodifiableMap(aliases),
@@ -389,7 +401,7 @@ public final class Descriptors {
         private Descriptor.Typed typed(String w, Object v) {
             Map<String, Object> t = map(w, v);
             keys(w, t, Set.of("type", "schema", "contract", "max-rows", "overlays", "label", "help", "unit", "default", "required", "min", "max",
-                    "allowed", "options", "items", "fields"), "type");
+                    "allowed", "options", "items", "fields", "forces"), "type");
             String type = text(w + ".type", t.get("type"));
             if (!TYPED.contains(type)) {
                 throw bad(w + ".type", "one of " + new java.util.TreeSet<>(TYPED));
@@ -412,6 +424,10 @@ public final class Descriptors {
                 throw bad(w + ".items", "text, int, number, decimal, bool or date");
             }
             Map<String, Descriptor.Typed> fields = t.get("fields") == null ? null : typedMap(w + ".fields", t.get("fields"));
+            String forces = optText(w + ".forces", t.get("forces"));
+            if (forces != null && (!"exact-path".equals(forces) || !"bool".equals(type))) {
+                throw bad(w + ".forces", "forces: exact-path, on a bool option only");
+            }
             return new Descriptor.Typed(type, t.get("schema") == null ? null : map(w + ".schema", t.get("schema")),
                     t.get("contract") == null ? null : contract(w + ".contract", t.get("contract")),
                     t.get("max-rows") == null ? null : (int) nonNegative(w + ".max-rows", t.get("max-rows")),
@@ -419,7 +435,7 @@ public final class Descriptors {
                     optText(w + ".label", t.get("label")), optText(w + ".help", t.get("help")), optText(w + ".unit", t.get("unit")),
                     t.get("default"), flag(w + ".required", t.get("required"), false), number(w + ".min", t.get("min")), number(w + ".max", t.get("max")),
                     t.get("allowed") == null ? null : List.copyOf((List<Object>) list(w + ".allowed", t.get("allowed"))),
-                    t.get("options") == null ? null : texts(w + ".options", t.get("options")), items, fields);
+                    t.get("options") == null ? null : texts(w + ".options", t.get("options")), items, fields, forces);
         }
 
         private static void need(String w, Map<String, Object> t, String key) {

@@ -34,6 +34,7 @@ class ParamsTest {
             title: A calculator
             about: Adds.
             publisher: { id: org.example, name: Example }
+            product: example-lab
             api: "0.1"
             inputs: {}
             params:

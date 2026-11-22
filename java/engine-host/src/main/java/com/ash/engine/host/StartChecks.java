@@ -44,12 +44,18 @@ public final class StartChecks {
 
     /** The checks for {@code r} of {@code jar} under {@code file}; {@code kitMajor}: the major of the kit whose certificates the host accepts. */
     public static Verdict check(EngineJar jar, EngineJar.Registered r, EngineFile file, Trust trust, String kitMajor) {
+        return check(jar, r, file, trust, kitMajor, Licence.ALL);
+    }
+
+    /** As {@link #check(EngineJar, EngineJar.Registered, EngineFile, Trust, String)}, with the installation's licence ({@code ENG-1014}). */
+    public static Verdict check(EngineJar jar, EngineJar.Registered r, EngineFile file, Trust trust, String kitMajor, Licence licence) {
         List<Problem> p = new ArrayList<>(r.problems());
         Descriptor d = r.descriptor();
         Optional<Certificate> cert = Certificate.beside(jar.path());
         if (d == null) {
             return new Verdict(p, null, cert);
         }
+        licence.check(d, jar.path().getFileName().toString()).ifPresent(p::add);
         Descriptors.problems(d).forEach(x -> p.add(new Problem("ENG-1001", d.id() + ": " + x)));
         String file0 = jar.path().getFileName().toString();
         EngineFile.Pin pin = file.pin();
