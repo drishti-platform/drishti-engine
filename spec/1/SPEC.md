@@ -279,6 +279,12 @@ public interface Engine {
      */
     Session session(Snapshot snapshot, Inputs inputs, Control control) throws EngineException;
 
+    /** Verdict UP / DEGRADED / DOWN / SUSPENDED in agreement with the lifecycle state, reasons in words. Cheap; no blocking, no I/O (7.4). */
+    Health health();
+
+    /** Typed counters: requests by outcome, latency percentiles, rows, bytes, caches, sessions, queue, last activity (7.5). Same cost rules. */
+    EngineStats stats();
+
     /** Status words for a host's administrator (a native library loaded, or fallen back to Java). Cheap; never row values. */
     default List<String> notes() { return List.of(); }
 
@@ -728,6 +734,61 @@ Every engine implements five lifecycle methods: `init`, `start`, `suspend`, `res
 | `CANCELLED`, `TIMED_OUT` | `Control.check()` threw; the engine lets it pass |
 | `FAILED` | any other exception; its text goes to the host's log only |
 
+### 7.4 Health
+
+Every engine implements `Health health()` (`com.ash.engine.Health`): a verdict `state`, `reasons` in words a person may read (never row
+values), and `checkedAt` read from the context's clock.
+
+| `state` | Means | Accompanies lifecycle state |
+|---|---|---|
+| `UP` | serving normally | `RUNNING` |
+| `DEGRADED` | serving, impaired (a native library fell back to Java, a cache thrashes, a supplier is slow); reasons say what | `RUNNING` |
+| `DOWN` | not serving | `NEW`, `INITIALISED`, `FAILED`, `SHUTDOWN` |
+| `SUSPENDED` | deliberately not taking work | `SUSPENDED` |
+
+1. The verdict MUST agree with the lifecycle state in the table; `Health.consistent` is the rule. Any verdict other than `UP` carries at
+   least one reason.
+2. Cost: `health()` MUST be cheap and MUST NOT block, wait for a lock a request holds, or do I/O (no file, network, supplier or database
+   call). It reports what the engine already knows: flags, counters, the result of a check made at `start` or on a request. It is callable
+   in any state and from any thread, also while a request runs, and returns within 50 ms. [K]
+3. The host owns the lifecycle state. When an engine's verdict contradicts it, the host reports the corrected verdict (`DEGRADED` while
+   running, otherwise the state's own) and adds its words to the reasons; an engine whose `health()` throws is `DEGRADED` while running.
+
+### 7.5 Stats
+
+Every engine implements `EngineStats stats()` (`com.ash.engine.EngineStats`): a typed snapshot taken from counters the engine already
+keeps. It has two views of `Counters`, `sinceStart` (since `start`; kept across `suspend` and `resume`) and `recent` (the last five
+minutes), and the gauges and times below.
+
+| Field | Meaning |
+|---|---|
+| `asked`, `answered`, `refused`, `failed`, `cancelled` | requests that reached the engine, and how they finished (7.3: an Answer; REFUSED, NOT_PERMITTED, LIMIT; FAILED; CANCELLED, TIMED_OUT) |
+| `p50Nanos`, `p95Nanos`, `p99Nanos` | latency of finished requests, in nanoseconds; 0 when none |
+| `rowsIn`, `rowsOut`, `bytesIn`, `bytesOut` | rows and bytes read from inputs and returned in answers |
+| `cacheHits`, `cacheMisses` | the engine's own caches (not the host's answer cache, which the host counts) |
+| `sessionsOpen`, `queueDepth` | gauges: sessions open now; requests waiting inside the engine (0 when it queues none) |
+| `lastActivity`, `takenAt` | the context's clock at the last finished request (null when none), and at the snapshot |
+
+1. Counters in `sinceStart` never decrease while the instance lives; `asked` is at least `answered + refused + failed + cancelled` (the
+   difference is the requests in flight); `p50 <= p95 <= p99`. [K]
+2. The counters agree with the requests made: N requests that reached the engine raise `asked` by N, and their outcomes raise one outcome
+   counter each by 1. A request the host refused before the engine (`ENG-5020`, `ENG-5023`) never reached it and is counted by the host,
+   not by the engine. [K]
+3. Cost as health (7.4 rule 2): no lock a request holds, no I/O, bounded time, any state, any thread. Recording an event costs one atomic
+   add. `EngineMeter` is the ready-made recorder (counters, latency buckets, the recent window, `measure` around a request); an engine
+   MAY use another if it meets these rules.
+4. Never row values: counters and sizes only.
+
+### 7.6 What the host does with them
+
+1. The host polls `health()` and `stats()` of every instance on its own schedule (`HealthBoard`), keeps the last answer of each, and
+   serves its health page, its metrics and its API from that memory; a page view never calls an engine.
+2. It aggregates: one entry per instance, the worst state overall (`DOWN` over `DEGRADED` over `SUSPENDED` over `UP`), and the host's own
+   counters of refused-before-engine requests beside the engine's.
+3. A pack that binds an input or an output of an engine (section 10) depends on it: while that engine is `DOWN` or `SUSPENDED`, each
+   dependent pack reports `DEGRADED` with the engine named in the reasons, and the engine's absence behaviour (10.3) applies.
+4. The same two methods are the obligation of every engine in the family, and the host's pack and connector health follows the same shape.
+
 ## 8. Obligations
 
 ### 8.1 Determinism
@@ -1163,6 +1224,7 @@ is exact: all rows, in order, all listed columns; an unlisted column of the outp
 | Cases | each case's `expect` |
 | Laws | 12.4, on every case unless skipped with a reason |
 | Lifecycle | section 7; 8.5; two instances; an empty work folder; a 1 MB budget gives `ENG-5002` and the next ask works |
+| Observability | 7.4 and 7.5: health agrees with the lifecycle state in every state; health and stats return within 50 ms, also while a request runs; counters monotonic and equal to the requests the kit made; the sessions gauge returns to zero |
 | Explain | 8.3 for each measure cell of each case |
 | Gates | 12.5 |
 

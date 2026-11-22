@@ -22,6 +22,7 @@ import com.ash.engine.Cell;
 import com.ash.engine.Control;
 import com.ash.engine.EngineContext;
 import com.ash.engine.EngineException;
+import com.ash.engine.EngineMeter;
 import com.ash.engine.EngineException.Kind;
 import com.ash.engine.Explaining;
 import com.ash.engine.Explanation;
@@ -56,9 +57,12 @@ final class GroupTotalsSession implements Session, Explaining {
     private final TableSchema schema;
     private final Snapshot snapshot;
     private final Inputs inputs;
+    private final EngineMeter meter;
     private final boolean fixedOrder;
 
-    GroupTotalsSession(EngineContext context, TableSchema schema, Snapshot snapshot, Inputs inputs, boolean fixedOrder) {
+    GroupTotalsSession(EngineContext context, EngineMeter meter, TableSchema schema, Snapshot snapshot, Inputs inputs, boolean fixedOrder) {
+        this.meter = meter;
+        meter.sessionOpened();
         this.context = context;
         this.schema = schema;
         this.snapshot = snapshot;
@@ -84,6 +88,10 @@ final class GroupTotalsSession implements Session, Explaining {
 
     @Override
     public Answer ask(Request request, Control control) throws EngineException {
+        return meter.measure(() -> compute(request, control), 0, 0);
+    }
+
+    private Answer compute(Request request, Control control) throws EngineException {
         InputTable t = inputs.table("items");
         Missing missing = missing(t, request);
         if (missing != null) {
@@ -221,6 +229,7 @@ final class GroupTotalsSession implements Session, Explaining {
 
     @Override
     public void close() {
+        meter.sessionClosed();
         // nothing is held between asks
     }
 }

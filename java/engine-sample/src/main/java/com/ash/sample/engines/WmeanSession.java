@@ -22,6 +22,7 @@ import com.ash.engine.Changes;
 import com.ash.engine.Control;
 import com.ash.engine.EngineContext;
 import com.ash.engine.EngineException;
+import com.ash.engine.EngineMeter;
 import com.ash.engine.EngineException.Kind;
 import com.ash.engine.Explaining;
 import com.ash.engine.Explanation;
@@ -50,6 +51,8 @@ import java.util.Map;
 /** A wmean session: the observations of one snapshot, replaced whole by {@link #apply}. Holds nothing of a viewer. */
 final class WmeanSession implements Session, Explaining, Incremental, Partitioned {
 
+    private final EngineMeter meter;
+
     private final EngineContext context;
     private final Snapshot snapshot;
     private final List<String> lacking;
@@ -58,8 +61,10 @@ final class WmeanSession implements Session, Explaining, Incremental, Partitione
     private volatile Observations rows;
     private volatile boolean closed;
 
-    WmeanSession(EngineContext context, TableSchema schema, Snapshot snapshot, Observations rows, List<String> lacking,
+    WmeanSession(EngineContext context, EngineMeter meter, TableSchema schema, Snapshot snapshot, Observations rows, List<String> lacking,
             MemoryBudget.Reservation hold) {
+        this.meter = meter;
+        meter.sessionOpened();
         this.context = context;
         this.schema = schema;
         this.snapshot = snapshot;
@@ -81,6 +86,10 @@ final class WmeanSession implements Session, Explaining, Incremental, Partitione
 
     @Override
     public Answer ask(Request request, Control control) throws EngineException {
+        return meter.measure(() -> compute(request, control), 0, 0);
+    }
+
+    private Answer compute(Request request, Control control) throws EngineException {
         Observations base = rows;
         if (base == null) {
             return Answers.notFound(context, this, request,
@@ -185,6 +194,7 @@ final class WmeanSession implements Session, Explaining, Incremental, Partitione
 
     @Override
     public void close() {
+        meter.sessionClosed();
         closed = true;
         rows = null;
         if (hold != null) {

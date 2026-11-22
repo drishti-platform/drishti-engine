@@ -21,11 +21,16 @@ import com.ash.engine.Engine;
 import com.ash.engine.EngineContext;
 import com.ash.engine.EngineException;
 import com.ash.engine.EngineException.Kind;
+import com.ash.engine.EngineStats;
+import com.ash.engine.Health;
 import com.ash.engine.Inputs;
 import com.ash.engine.LifecycleState;
 import com.ash.engine.Session;
 import com.ash.engine.Snapshot;
 import java.time.Duration;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -159,6 +164,54 @@ public final class EngineInstance implements AutoCloseable {
             state = LifecycleState.FAILED;
             failure = e.getMessage();
             throw e;
+        }
+    }
+
+    /**
+     * The instance's health (specification 7.4): the engine's own verdict, corrected by the host where it contradicts the lifecycle
+     * state the host owns (the host's words are added, the engine's kept). An engine that throws is DEGRADED while running. Cheap; calls
+     * no I/O of its own; safe from any thread in any state.
+     */
+    public Health health() {
+        LifecycleState s = state;
+        Instant now = Instant.now();
+        Health own;
+        try {
+            own = engine.health();
+        } catch (RuntimeException | LinkageError e) {
+            own = null;
+        }
+        if (own == null) {
+            Health base = Health.of(s, now);
+            return s == LifecycleState.RUNNING ? Health.degraded(now, "the engine's health check failed") : withState(base, s);
+        }
+        if (Health.consistent(own.state(), s)) {
+            return own;
+        }
+        List<String> why = new ArrayList<>(own.reasons());
+        why.add("the engine reported " + own.state() + " while the instance is " + s);
+        Health.State want = s == LifecycleState.RUNNING ? Health.State.DEGRADED
+                : s == LifecycleState.SUSPENDED ? Health.State.SUSPENDED : Health.State.DOWN;
+        return new Health(want, why, own.checkedAt());
+    }
+
+    private Health withState(Health base, LifecycleState s) {
+        if (s == LifecycleState.SUSPENDED && reason != null) {
+            return Health.suspended(base.checkedAt(), reason);
+        }
+        if (s == LifecycleState.FAILED && failure != null) {
+            return Health.down(base.checkedAt(), failure);
+        }
+        return base;
+    }
+
+    /** The engine's counters (specification 7.5); empty when the engine's {@code stats()} throws. */
+    public EngineStats stats() {
+        try {
+            EngineStats own = engine.stats();
+            return own == null ? EngineStats.empty(Instant.now()) : own;
+        } catch (RuntimeException | LinkageError e) {
+            return EngineStats.empty(Instant.now());
         }
     }
 

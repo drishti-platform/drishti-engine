@@ -160,6 +160,7 @@ public final class Checks {
             out.add(Result.fail("lifecycle", s, "shutdown without init", e.toString()));
         }
         out.addAll(Lifecycle.law(host, c, base));
+        out.addAll(Observability.law(host, c, base));
         try (KitHost.Opened a = host.open(c, KitHost.Variation.PLAIN); KitHost.Opened b = host.open(c, KitHost.Variation.PLAIN)) {
             out.add(sessionCapabilities(d, a.session(), s));
             if (!c.changes().isEmpty()) {

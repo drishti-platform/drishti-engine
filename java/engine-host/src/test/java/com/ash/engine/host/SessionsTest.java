@@ -51,6 +51,8 @@ class SessionsTest {
                 @Override public void close() { closed.incrementAndGet(); }
             };
         }
+        @Override public com.ash.engine.Health health() { return com.ash.engine.Health.up(java.time.Instant.EPOCH); }
+        @Override public com.ash.engine.EngineStats stats() { return com.ash.engine.EngineStats.empty(java.time.Instant.EPOCH); }
         @Override public void shutdown() { }
     }
 

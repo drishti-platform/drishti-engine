@@ -20,6 +20,10 @@ import com.ash.engine.Descriptor;
 import com.ash.engine.Descriptors;
 import com.ash.engine.Engine;
 import com.ash.engine.EngineContext;
+import com.ash.engine.EngineMeter;
+import com.ash.engine.EngineStats;
+import com.ash.engine.Health;
+import com.ash.engine.LifecycleState;
 import com.ash.engine.Inputs;
 import com.ash.engine.Session;
 import com.ash.engine.Snapshot;
@@ -34,6 +38,8 @@ public final class GroupTotalsEngine implements Engine {
     static final String ID = "group-totals";
 
     private volatile EngineContext context;
+    private volatile EngineMeter meter = new EngineMeter(java.time.Clock.systemUTC());
+    private volatile LifecycleState lifecycle = LifecycleState.NEW;
 
     @Override
     public Descriptor descriptor() {
@@ -43,30 +49,43 @@ public final class GroupTotalsEngine implements Engine {
     @Override
     public void init(EngineContext context) {
         this.context = context;
+        this.meter = new EngineMeter(context.clock());
+        this.lifecycle = LifecycleState.INITIALISED;
     }
 
     @Override
     public Session session(Snapshot snapshot, Inputs inputs, Control control) {
-        return new GroupTotalsSession(context, descriptor().schema("totals"), snapshot, inputs, context.options().flag("force-fixed-order"));
+        return new GroupTotalsSession(context, meter, descriptor().schema("totals"), snapshot, inputs, context.options().flag("force-fixed-order"));
     }
 
     @Override
     public void start() {
-        // nothing to acquire: no thread, no file, no native library, no cache
+        lifecycle = LifecycleState.RUNNING;
     }
 
     @Override
     public void suspend() {
-        // everything is kept; the host refuses new requests and sessions while suspended
+        lifecycle = LifecycleState.SUSPENDED;
     }
 
     @Override
     public void resume() {
-        // nothing was released, so nothing is reloaded
+        lifecycle = LifecycleState.RUNNING;
+    }
+
+    @Override
+    public Health health() {
+        return Health.of(lifecycle, meter.snapshot().takenAt());
+    }
+
+    @Override
+    public EngineStats stats() {
+        return meter.snapshot();
     }
 
     @Override
     public void shutdown() {
+        lifecycle = LifecycleState.SHUTDOWN;
         context = null;
     }
 }

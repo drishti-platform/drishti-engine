@@ -117,6 +117,14 @@ Launchers live in `run-configs/` (IntelliJ: open the repository root and link `j
 | `Engine: run kit (sample)` | the kit's command on the sample JAR (Debug works on it) |
 | `Engine: bench kit (sample)` | the benchmark run on the sample's reference asks |
 
+## Engine obligations
+
+Every engine, and every pack and connector the host runs, implements the five lifecycle methods (`init`, `start`, `suspend`, `resume`,
+`shutdown`; specification 7.1) and two observability methods: `health()` (UP, DEGRADED, DOWN or SUSPENDED, in agreement with the lifecycle,
+reasons in words; 7.4) and `stats()` (typed counters: requests by outcome, latency p50/p95/p99, rows, bytes, caches, sessions, queue,
+last activity; 7.5). Both are cheap, never block and never do I/O; `EngineMeter` records the counters. The kit's observability law
+proves them. Every engine in drishti-engines and in drishti-risk MUST implement both before its next release.
+
 ## Not in 0.1
 
 `engine-gen` (generated pages, screens, workbooks from steps), `engine-inputs-lake` (needs Lake's read API), the binder by contract and the triggers' firing (Drishti's side, H2), the process

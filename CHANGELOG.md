@@ -26,4 +26,11 @@ and the specification's draft 3 (`spec/1/SPEC.md`).
   `LifecycleState` (`NEW`, `INITIALISED`, `RUNNING`, `SUSPENDED`, `FAILED`, `SHUTDOWN`); `EngineInstance` runs the sequence, gates requests
   and sessions to `RUNNING`, drains or cancels calls in flight at suspend (`ENG-5023` "suspended" for new ones), shutdown in any state;
   the kit's lifecycle law (`Lifecycle`) proves it; both sample engines implement it; specification 7.1 rewritten, `ENG-5023` added.
+- Engine health and stats (owner requirement): `Engine.health()` (`Health`: `UP`, `DEGRADED`, `DOWN`, `SUSPENDED`, consistent with the lifecycle
+  state, reasons in words, `checkedAt`) and `Engine.stats()` (`EngineStats`: requests asked, answered, refused, failed, cancelled; latency
+  p50, p95, p99; rows and bytes in and out; cache hits and misses; sessions open; queue depth; last activity; since start and a five-minute
+  window); `EngineMeter` records them lock-free; `EngineInstance.health()` and `stats()` correct and guard the engine's answers;
+  `HealthBoard` polls, keeps the last answer, aggregates, and reports a pack DEGRADED while an engine it depends on is DOWN or SUSPENDED;
+  the kit's observability law (agreement with the lifecycle, bounded time, monotonic counters equal to the kit's requests); both sample
+  engines implement both; specification 7.4 to 7.6.
 - Guards, launchers per the platform launcher standard, README, LICENSE.

@@ -62,6 +62,22 @@ public interface Engine {
     }
 
     /**
+     * The engine's own verdict (specification 7.4): {@code UP} or {@code DEGRADED} while running, {@code SUSPENDED} after {@link #suspend},
+     * {@code DOWN} in every other state, so it always agrees with the lifecycle. Reasons in words. MUST be cheap and MUST NOT block or do
+     * I/O: it reads what the engine already knows (flags, counters, the last result of a check it ran at {@link #start}) and is callable
+     * in any state and from any thread, also while a request runs.
+     */
+    Health health();
+
+    /**
+     * A typed snapshot of the instance's counters (specification 7.5): requests asked, answered, refused, failed and cancelled; latency
+     * p50, p95 and p99; rows and bytes in and out; cache hits and misses; sessions open; queue depth; last activity; since start and over
+     * the recent window. Same cost rules as {@link #health}. Callable in any state; counters never go backwards while the instance lives.
+     * {@link EngineMeter} records and snapshots all of it.
+     */
+    EngineStats stats();
+
+    /**
      * Releases everything: threads, files, native handles, memory. Sessions are already closed. Callable in any state, also after a
      * failed {@link #init}, and idempotent: a second call does nothing and does not throw.
      */

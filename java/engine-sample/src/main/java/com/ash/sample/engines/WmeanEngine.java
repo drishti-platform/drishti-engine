@@ -22,6 +22,10 @@ import com.ash.engine.Descriptor;
 import com.ash.engine.Descriptors;
 import com.ash.engine.Engine;
 import com.ash.engine.EngineContext;
+import com.ash.engine.EngineMeter;
+import com.ash.engine.EngineStats;
+import com.ash.engine.Health;
+import com.ash.engine.LifecycleState;
 import com.ash.engine.EngineException;
 import com.ash.engine.EngineException.Kind;
 import com.ash.engine.InputTable;
@@ -55,6 +59,8 @@ public final class WmeanEngine implements Engine, Assembling {
     static final List<String> COLUMNS = List.of("ID", "GROUP", "VALUE", "WEIGHT");
 
     private volatile EngineContext context;
+    private volatile EngineMeter meter = new EngineMeter(java.time.Clock.systemUTC());
+    private volatile LifecycleState lifecycle = LifecycleState.NEW;
     private volatile TableSchema schema;
 
     @Override
@@ -65,6 +71,8 @@ public final class WmeanEngine implements Engine, Assembling {
     @Override
     public void init(EngineContext context) {
         this.context = context;
+        this.meter = new EngineMeter(context.clock());
+        this.lifecycle = LifecycleState.INITIALISED;
         this.schema = descriptor().schema(OUTPUT);
     }
 
@@ -72,11 +80,11 @@ public final class WmeanEngine implements Engine, Assembling {
     public Session session(Snapshot snapshot, Inputs inputs, Control control) throws EngineException {
         InputTable t = inputs.table(INPUT);
         if (!t.present()) {
-            return new WmeanSession(context, schema, snapshot, null, List.of(), null);
+            return new WmeanSession(context, meter, schema, snapshot, null, List.of(), null);
         }
         List<String> lacking = COLUMNS.stream().filter(c -> !t.columns().contains(c)).toList();
         if (!lacking.isEmpty()) {
-            return new WmeanSession(context, schema, snapshot, null, lacking, null);
+            return new WmeanSession(context, meter, schema, snapshot, null, lacking, null);
         }
         MemoryBudget.Reservation hold = context.memory().reserve(65_536 + 40L * Math.max(t.rows(), 0), INPUT);
         try {
@@ -85,7 +93,7 @@ public final class WmeanEngine implements Engine, Assembling {
                 control.check();
                 rows.add(batch);
             });
-            return new WmeanSession(context, schema, snapshot, rows.build(), List.of(), hold);
+            return new WmeanSession(context, meter, schema, snapshot, rows.build(), List.of(), hold);
         } catch (EngineException | RuntimeException e) {
             hold.close();
             throw e;
@@ -114,21 +122,32 @@ public final class WmeanEngine implements Engine, Assembling {
 
     @Override
     public void start() {
-        // nothing to acquire: no thread, no file, no native library, no cache
+        lifecycle = LifecycleState.RUNNING;
     }
 
     @Override
     public void suspend() {
-        // everything is kept; the host refuses new requests and sessions while suspended
+        lifecycle = LifecycleState.SUSPENDED;
     }
 
     @Override
     public void resume() {
-        // nothing was released, so nothing is reloaded
+        lifecycle = LifecycleState.RUNNING;
+    }
+
+    @Override
+    public Health health() {
+        return Health.of(lifecycle, meter.snapshot().takenAt());
+    }
+
+    @Override
+    public EngineStats stats() {
+        return meter.snapshot();
     }
 
     @Override
     public void shutdown() {
+        lifecycle = LifecycleState.SHUTDOWN;
         context = null;
     }
 }
