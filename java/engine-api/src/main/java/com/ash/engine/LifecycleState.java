@@ -14,7 +14,6 @@
  * See the LICENSE file in the root of this repository for the full terms.
  */
 package com.ash.engine;
-package com.ash.engine;
 
 /**
  * The states of an engine instance (specification 7.1). The host owns the state; an engine does not track it for the host, but
