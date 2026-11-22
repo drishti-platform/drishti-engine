@@ -1,0 +1,51 @@
+# Copyright (c) 2026 Ashutosh Sinha <ajsinha@gmail.com>. All rights reserved. Drishti Engine. Proprietary: see LICENSE.
+# The kit cases of the query-side sample: totals by group, read as the caller, grouped at the source or scanned.
+suite: group-totals/totals
+engine: group-totals
+since: "1.0"
+description: Totals by group; a viewer; the fixed-order path; a missing table; a refusal.
+given:
+  inputs:
+    items:
+      rows:
+        - { ID: i1, GROUP: A, QTY: 2, AMOUNT: 10.5 }
+        - { ID: i2, GROUP: A, QTY: 3, AMOUNT: 0.25 }
+        - { ID: i3, GROUP: B, QTY: 1, AMOUNT: 7.0 }
+        - { ID: i4, GROUP: B, QTY: 4, AMOUNT: 1.125 }
+cases:
+  - id: totals
+    source: "by hand: A = 2 items, 5, 10.5 + 0.25 = 10.75; B = 2 items, 5, 7 + 1.125 = 8.125"
+    reference: true
+    request: { outputs: [ totals ], params: {}, visibility: all, seed: 0 }
+    expect:
+      status: complete
+      tables:
+        totals:
+          columns: [ GROUP, ITEMS, QTY, AMOUNT ]
+          rows: [ [ A, 2, 5, 10.75 ], [ B, 2, 5, 8.125 ] ]
+
+  - id: a-viewer-of-group-a
+    source: "by hand: the host delivers group A only"
+    request: { outputs: [ totals ], params: {}, visibility: { items: { eq: [ GROUP, A ] } }, seed: 0 }
+    expect:
+      status: complete
+      tables: { totals: { columns: [ GROUP, ITEMS, QTY, AMOUNT ], rows: [ [ A, 2, 5, 10.75 ] ] } }
+
+  - id: the-fixed-order-path
+    source: "by hand, as the first case: the same figures summed in ID order"
+    given: { options: { force-fixed-order: true } }
+    request: { outputs: [ totals ], params: {}, visibility: all, seed: 0 }
+    expect:
+      status: complete
+      tables: { totals: { columns: [ GROUP, ITEMS, QTY, AMOUNT ], rows: [ [ A, 2, 5, 10.75 ], [ B, 2, 5, 8.125 ] ] } }
+
+  - id: no-items-table
+    source: "section 8.2"
+    given: { inputs: { items: absent } }
+    request: { outputs: [ totals ], params: {}, visibility: all, seed: 0 }
+    expect: { status: not-found, missing: [ { input: items, outputs: [ totals ] } ] }
+
+  - id: a-request-without-rows-of-items-is-refused
+    source: "section 8.6 rule 1"
+    request: { outputs: [ totals ], params: {}, visibility: {}, seed: 0 }
+    expect: { refused: ENG-4002 }

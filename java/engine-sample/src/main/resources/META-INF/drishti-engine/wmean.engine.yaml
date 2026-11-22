@@ -1,0 +1,46 @@
+# Copyright (c) 2026 Ashutosh Sinha <ajsinha@gmail.com>. All rights reserved. Drishti Engine. Proprietary: see LICENSE.
+# The sample engine of the specification's worked example (section 16): the weighted mean of a value by group.
+engine: 1
+id: wmean
+version: 1.0.0
+title: Weighted mean
+about: The weighted mean of a value by group, from observations supplied under a contract.
+publisher: { id: com.ash.sample, name: Drishti Engine samples }
+api: "0.1"
+platform: { tools: "1.1" }
+snapshot:
+  dimensions: [ { name: date, type: date, label: Business date } ]
+inputs:
+  observations:
+    contract: stats/observation@1
+    about: One row per observation. A row without a value or a weight is left out.
+    key: [ ID ]
+    columns: [ ID, GROUP, VALUE, WEIGHT ]
+    scope-columns: [ GROUP ]
+    changes: rows
+params:
+  min-weight: { type: number, default: 0, min: 0, label: Minimum weight, help: Observations with a smaller weight are left out. }
+  what-if:
+    type: table
+    contract: stats/observation@1
+    max-rows: 1000
+    overlays: observations
+    label: What-if observations
+    help: Rows that stand over the observations for this request only, by ID; nothing is stored.
+outputs:
+  mean-by-group:
+    title: Weighted mean by group
+    about: One row per group that has observations of positive total weight at or above the minimum weight.
+    params: [ min-weight, what-if ]
+    key: [ GROUP ]
+    columns:
+      - { name: GROUP,  type: string,  nullable: false, label: Group }
+      - { name: COUNT,  type: integer, nullable: false, label: Observations }
+      - { name: WEIGHT, type: number,  nullable: false, label: Total weight }
+      - { name: MEAN,   type: number,  nullable: false, label: Weighted mean, measure: true, exact: bits }
+capabilities: [ explain, workbook, incremental, partition, progressive ]
+partition: { input: observations, unit: GROUP }
+limits:
+  memory: { fixed-bytes: 65536, per-row-bytes: { observations: 40 } }
+  cancel-latency: 200ms
+ui: { group: Statistics, words: [ WMEAN ] }

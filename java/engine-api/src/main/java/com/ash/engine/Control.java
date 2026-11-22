@@ -1,0 +1,34 @@
+/*
+ * Drishti Engine · engines by contract, proven with a JDK only.
+ *
+ * Copyright (c) 2026 Ashutosh Sinha <ajsinha@gmail.com>.
+ * All rights reserved.
+ *
+ * PROPRIETARY AND CONFIDENTIAL.
+ *
+ * This file is the confidential and proprietary property of Ashutosh Sinha.
+ * Unauthorised copying, use, modification, distribution or disclosure of this
+ * file, via any medium, is strictly prohibited except with the express prior
+ * written permission of the copyright holder.
+ *
+ * See the LICENSE file in the root of this repository for the full terms.
+ */
+package com.ash.engine;
+
+import java.time.Instant;
+
+/** A request's control: cancellation, deadline, progress, and (capability {@code progressive}) an interim answer. */
+public interface Control {
+
+    boolean cancelled();
+
+    /** Throws ENG-5010 (cancelled) or ENG-5011 (deadline passed). Called at least once per batch and once per declared cancel latency. */
+    void check() throws EngineException;
+
+    Instant deadline();
+
+    void progress(double fraction, String words);
+
+    /** Capability {@code progressive}: a first answer the host may show before ask returns. Its status MUST be INTERIM. */
+    void interim(Answer answer);
+}

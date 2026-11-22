@@ -1,0 +1,92 @@
+# Copyright (c) 2026 Ashutosh Sinha <ajsinha@gmail.com>. All rights reserved. Drishti Engine. Proprietary: see LICENSE.
+# The kit cases of the worked example (specification section 16.3), and the what-if, missing-column and visibility cases.
+suite: wmean/mean-by-group
+engine: wmean
+since: "1.0"
+description: The weighted mean by group; the minimum weight; a viewer; a change; what-if rows; a missing table and column; refusals.
+given:
+  snapshot: { date: "2026-01-13" }
+  inputs:
+    observations:
+      rows:
+        - { ID: o1, GROUP: A, VALUE: 10, WEIGHT: 1 }
+        - { ID: o2, GROUP: A, VALUE: 20, WEIGHT: 3 }
+        - { ID: o3, GROUP: B, VALUE: 5,  WEIGHT: 2 }
+cases:
+  - id: two-groups
+    source: "by hand: A = (10×1 + 20×3) / 4 = 17.5; B = (5×2) / 2 = 5"
+    reference: true
+    request: { outputs: [ mean-by-group ], params: {}, visibility: all, seed: 0 }
+    expect:
+      status: complete
+      tables:
+        mean-by-group:
+          columns: [ GROUP, COUNT, WEIGHT, MEAN ]
+          rows:
+            - [ A, 2, 4, "0x4031800000000000" ]      # 17.5
+            - [ B, 1, 2, 5 ]
+
+  - id: minimum-weight-leaves-an-observation-out
+    source: "by hand: A keeps o2 only: 20"
+    request: { outputs: [ mean-by-group ], params: { min-weight: 2 }, visibility: all, seed: 0 }
+    expect:
+      status: complete
+      tables: { mean-by-group: { columns: [ GROUP, COUNT, WEIGHT, MEAN ], rows: [ [ A, 1, 3, 20 ], [ B, 1, 2, 5 ] ] } }
+
+  - id: a-viewer-of-group-b-sees-only-b
+    source: "filter equivalence, by hand"
+    request: { outputs: [ mean-by-group ], params: {}, visibility: { observations: { eq: [ GROUP, B ] } }, seed: 0 }
+    expect:
+      status: complete
+      tables: { mean-by-group: { columns: [ GROUP, COUNT, WEIGHT, MEAN ], rows: [ [ B, 1, 2, 5 ] ] } }
+
+  - id: a-new-observation-arrives
+    source: "by hand: A = (10 + 60 + 30×4) / 8 = 23.75"
+    request: { outputs: [ mean-by-group ], params: {}, visibility: all, seed: 0 }
+    changes: [ { input: observations, upserts: [ { ID: o4, GROUP: A, VALUE: 30, WEIGHT: 4 } ] } ]
+    expect:
+      status: complete
+      tables: { mean-by-group: { columns: [ GROUP, COUNT, WEIGHT, MEAN ], rows: [ [ A, 3, 8, 23.75 ], [ B, 1, 2, 5 ] ] } }
+
+  - id: what-if-rows-stand-over-the-observations
+    source: "by hand: o3 becomes B 7 × 2, so B = 7; o9 adds C = 1; A is unchanged at 17.5"
+    request:
+      outputs: [ mean-by-group ]
+      params:
+        what-if:
+          - { ID: o3, GROUP: B, VALUE: 7, WEIGHT: 2 }
+          - { ID: o9, GROUP: C, VALUE: 1, WEIGHT: 1 }
+      visibility: all
+      seed: 0
+    expect:
+      status: complete
+      tables:
+        mean-by-group:
+          columns: [ GROUP, COUNT, WEIGHT, MEAN ]
+          rows: [ [ A, 2, 4, 17.5 ], [ B, 1, 2, 7 ], [ C, 1, 1, 1 ] ]
+
+  - id: no-observations-table
+    source: "section 8.2"
+    given: { inputs: { observations: absent } }
+    request: { outputs: [ mean-by-group ], params: {}, visibility: all, seed: 0 }
+    expect: { status: not-found, missing: [ { input: observations, outputs: [ mean-by-group ] } ] }
+
+  - id: a-missing-column-is-named
+    source: "section 8.2: the column WEIGHT is not delivered"
+    given:
+      inputs:
+        observations:
+          rows:
+            - { ID: o1, GROUP: A, VALUE: 10 }
+    request: { outputs: [ mean-by-group ], params: {}, visibility: all, seed: 0 }
+    expect: { status: not-found, missing: [ { input: observations, columns: [ WEIGHT ], outputs: [ mean-by-group ] } ] }
+
+  - id: negative-minimum-weight-is-refused
+    source: "section 3.2: min 0"
+    request: { outputs: [ mean-by-group ], params: { min-weight: -1 }, visibility: all, seed: 0 }
+    expect: { refused: ENG-3002 }
+
+  - id: a-request-without-rows-of-observations-is-refused
+    source: "section 8.6 rule 1"
+    request: { outputs: [ mean-by-group ], params: {}, visibility: {}, seed: 0 }
+    expect: { refused: ENG-4002 }

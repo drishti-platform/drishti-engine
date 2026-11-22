@@ -1,0 +1,35 @@
+// Copyright (c) 2026 Ashutosh Sinha <ajsinha@gmail.com>. All rights reserved.
+// Drishti Engine. Proprietary: see LICENSE.
+//
+// Engine in VS Code: File, Open Workspace from File. The tasks and launch configurations carry the SAME names as the JetBrains run
+// configurations in run-configs/ (the launcher standard: docs/plans/LAUNCHER_STANDARD.md in the Drishti repository). JDK 21: change the
+// Java path below (Windows: C:\\jdk-21). Build and run in the IDE: README.md#build-and-run-in-the-ide.
+{
+  "folders": [{"name": "engine", "path": "."}],
+  "extensions": {"recommendations": ["vscjava.vscode-java-pack", "redhat.vscode-xml"]},
+  "settings": {
+    "java.configuration.runtimes": [{"name": "JavaSE-21", "path": "/usr/lib/jvm/java-21-openjdk-amd64", "default": true}],
+    "java.jdt.ls.java.home": "/usr/lib/jvm/java-21-openjdk-amd64",
+    "java.import.maven.enabled": true,
+    "java.configuration.updateBuildConfiguration": "automatic"
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {"label": "Engine: build all", "type": "shell", "command": "./mvnw clean verify -DskipTests", "windows": {"command": "mvnw.cmd clean verify -DskipTests"}, "options": {"cwd": "${workspaceFolder:engine}/java"}, "group": "build", "problemMatcher": []},
+      {"label": "Engine: test", "type": "shell", "command": "./mvnw clean verify", "windows": {"command": "mvnw.cmd clean verify"}, "options": {"cwd": "${workspaceFolder:engine}/java"}, "group": "test", "problemMatcher": []},
+      {"label": "Engine: check guards", "type": "shell", "command": "./mvnw clean verify -pl engine-guards -am", "windows": {"command": "mvnw.cmd clean verify -pl engine-guards -am"}, "options": {"cwd": "${workspaceFolder:engine}/java"}, "group": "test", "problemMatcher": []},
+      {"label": "Engine: maintain API surface (rewrite)", "type": "shell", "command": "./mvnw clean verify -Dengine.api.surface.write=true", "windows": {"command": "mvnw.cmd clean verify -Dengine.api.surface.write=true"}, "options": {"cwd": "${workspaceFolder:engine}/java"}, "problemMatcher": []},
+      {"label": "Engine: install release (tag only)", "type": "shell", "command": "./mvnw clean install -DskipTests", "windows": {"command": "mvnw.cmd clean install -DskipTests"}, "options": {"cwd": "${workspaceFolder:engine}/java"}, "problemMatcher": []}
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {"type": "java", "name": "Engine: run kit (sample)", "request": "launch", "mainClass": "com.ash.engine.tck.Main", "projectName": "engine-tck", "cwd": "${workspaceFolder:engine}/java",
+       "args": "tck run --engine ${workspaceFolder:engine}/java/engine-sample/target/engine-sample-0.1.0-SNAPSHOT.jar --cases ${workspaceFolder:engine}/java/engine-sample/tck/cases --out ${workspaceFolder:engine}/java/engine-sample/target/kit"},
+      {"type": "java", "name": "Engine: bench kit (sample)", "request": "launch", "mainClass": "com.ash.engine.tck.Main", "projectName": "engine-tck", "cwd": "${workspaceFolder:engine}/java",
+       "args": "tck bench --engine ${workspaceFolder:engine}/java/engine-sample/target/engine-sample-0.1.0-SNAPSHOT.jar --cases ${workspaceFolder:engine}/java/engine-sample/tck/cases --out ${workspaceFolder:engine}/java/engine-sample/target/bench.jsonl --asks 200"}
+    ]
+  }
+}

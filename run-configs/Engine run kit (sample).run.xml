@@ -1,0 +1,20 @@
+<!--
+  Copyright (c) 2026 Ashutosh Sinha <ajsinha@gmail.com>. All rights reserved.
+  Drishti Engine. Proprietary: see LICENSE.
+
+  Engine: run kit (sample): the kit's command on the sample engine JAR: every case, every law, the explanations and workbooks, the gates; results under engine-sample/target/kit.
+  Use it when: to read the kit's report for the sample, or to debug a law.
+  Build first (Engine: test, or Engine: build all) so the sample JAR exists. Debug is the IDE's Debug button on this launcher.
+  Shared, so it is in git: copy the configuration (Ctrl+D) to change it; a pull overwrites this file.
+-->
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Engine: run kit (sample)" type="Application" factoryName="Application" folderName="Engine">
+    <option name="MAIN_CLASS_NAME" value="com.ash.engine.tck.Main" />
+    <module name="engine-tck" />
+    <option name="PROGRAM_PARAMETERS" value="tck run --engine $PROJECT_DIR$/java/engine-sample/target/engine-sample-0.1.0-SNAPSHOT.jar --cases $PROJECT_DIR$/java/engine-sample/tck/cases --out $PROJECT_DIR$/java/engine-sample/target/kit" />
+    <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/java" />
+    <method v="2">
+      <option name="Make" enabled="true" />
+    </method>
+  </configuration>
+</component>

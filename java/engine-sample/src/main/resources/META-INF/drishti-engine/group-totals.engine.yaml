@@ -1,0 +1,40 @@
+# Copyright (c) 2026 Ashutosh Sinha <ajsinha@gmail.com>. All rights reserved. Drishti Engine. Proprietary: see LICENSE.
+# The sample engine of the query side: totals by group read as the caller, grouped at the source when the host offers it.
+engine: 1
+id: group-totals
+version: 1.0.0
+title: Totals by group
+about: Item count, quantity and amount by group, read as the caller; grouped at the source when the host can, otherwise scanned.
+publisher: { id: com.ash.sample, name: Drishti Engine samples }
+api: "0.1"
+platform: { tools: "1.1" }
+inputs:
+  items:
+    contract: sample/item@1
+    about: One row per item, read as the caller (the host applies the caller's row rules).
+    mode: request
+    key: [ ID ]
+    columns: [ ID, GROUP, QTY, AMOUNT ]
+    scope-columns: [ GROUP ]
+options:
+  force-fixed-order:
+    type: bool
+    default: false
+    label: Force the fixed-order path
+    help: Never use a grouped scan; sum each group in ID order, so the amount is the same bits wherever it runs.
+outputs:
+  totals:
+    title: Totals by group
+    about: >-
+      One row per group. AMOUNT is summed from floating-point states when the source groups it, so it is exact to relative 1e-12;
+      with force-fixed-order it is summed in ID order and is the same bits.
+    key: [ GROUP ]
+    columns:
+      - { name: GROUP,  type: string,  nullable: false, label: Group }
+      - { name: ITEMS,  type: integer, nullable: false, label: Items }
+      - { name: QTY,    type: integer, nullable: false, label: Quantity, measure: true }
+      - { name: AMOUNT, type: number,  nullable: false, label: Amount, measure: true, exact: "relative:1e-12" }
+capabilities: [ explain, workbook ]
+limits:
+  cancel-latency: 200ms
+ui: { group: Statistics, words: [ GTOT ] }

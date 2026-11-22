@@ -1,0 +1,41 @@
+<!--
+  Copyright (c) 2026 Ashutosh Sinha <ajsinha@gmail.com>. All rights reserved.
+  Drishti Engine. Proprietary: see LICENSE.
+
+  Engine: maintain API surface (rewrite): rewrites each module's api-surface.txt from the compiled classes (additions only; a removal needs -Dengine.api.surface.major=true).
+  Use it when: after adding public API on purpose; review the diff and commit it with the change.
+  Shared, so it is in git: copy the configuration (Ctrl+D) to change it; a pull overwrites this file.
+-->
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Engine: maintain API surface (rewrite)" type="MavenRunConfiguration" factoryName="Maven" folderName="Engine">
+    <MavenSettings>
+      <option name="myGeneralSettings" />
+      <option name="myRunnerSettings">
+        <MavenRunnerSettings>
+          <option name="jreName" value="#USE_PROJECT_JDK" />
+        </MavenRunnerSettings>
+      </option>
+      <option name="myRunnerParameters">
+        <MavenRunnerParameters>
+          <option name="profiles">
+            <set />
+          </option>
+          <option name="goals">
+            <list>
+              <option value="clean" />
+              <option value="verify" />
+              <option value="-Dengine.api.surface.write=true" />
+            </list>
+          </option>
+          <option name="pomFileName" value="" />
+          <option name="profilesMap">
+            <map />
+          </option>
+          <option name="resolveToWorkspace" value="false" />
+          <option name="workingDirPath" value="$PROJECT_DIR$/java" />
+        </MavenRunnerParameters>
+      </option>
+    </MavenSettings>
+    <method v="2" />
+  </configuration>
+</component>
