@@ -35,6 +35,7 @@
     <dependency><groupId>com.ash.tools</groupId><artifactId>tools-xlsx</artifactId><scope>provided</scope></dependency>
     <!-- the kit and its harness, for this build's own tests only -->
     <dependency><groupId>com.ash.engine</groupId><artifactId>engine-tck</artifactId><scope>test</scope></dependency>
+    <dependency><groupId>com.ash.engine</groupId><artifactId>engine-cli</artifactId><scope>test</scope></dependency>
   </dependencies>
   <build>
     <plugins>

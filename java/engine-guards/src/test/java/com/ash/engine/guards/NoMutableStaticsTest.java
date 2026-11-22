@@ -38,7 +38,7 @@ class NoMutableStaticsTest {
     @Test
     void noModuleHoldsMutableStaticState() throws Exception {
         List<String> out = new ArrayList<>();
-        for (String m : List.of("engine-api", "engine-host", "engine-tck", "engine-sample")) {
+        for (String m : List.of("engine-api", "engine-host", "engine-inputs-files", "engine-tck", "engine-cli", "engine-sample")) {
             Path classes = Repo.JAVA.resolve(m).resolve("target/classes");
             if (!Files.isDirectory(classes)) {
                 out.add(m + ": not built");

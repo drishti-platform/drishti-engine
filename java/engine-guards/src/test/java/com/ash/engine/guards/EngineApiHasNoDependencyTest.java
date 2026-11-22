@@ -53,6 +53,11 @@ class EngineApiHasNoDependencyTest {
         assertEquals(List.of("engine-api"), deps);
     }
 
+    @Test
+    void theFileInputsImportTheJdkAndTheApiOnly() {
+        assertEquals(List.of(), imports("engine-inputs-files", "java.", "com.ash.engine."));
+    }
+
     private static List<String> imports(String module, String... allowed) {
         List<String> out = new ArrayList<>();
         Pattern imp = Pattern.compile("(?m)^import (static )?([\\w.]+)");

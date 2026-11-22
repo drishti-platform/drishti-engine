@@ -15,4 +15,8 @@ and the specification's draft 3 (`spec/1/SPEC.md`).
   (Rachana core, Apache POI), lifecycle, gates, results, report, certificate, `tck run` and `tck bench`, the JUnit harness, and the
   runnable `-cli` JAR.
 - `engine-sample`: `wmean` and `group-totals` in one JAR with their cases; the kit and the drop-in tests on the packaged JAR.
+- `engine-host` runtime parts (E3, the generic ones): the engine file and its start checks, the certificate, the instance lifecycle, the
+  session pool, admission, the answer cache, coalescing, the engine-file template.
+- `engine-inputs-files` (rows in memory as a host delivers them; JSONL folders) and `engine-cli` (`engine run`, E5); the kit's inputs
+  moved there (one way).
 - Guards, launchers per the platform launcher standard, README, LICENSE.

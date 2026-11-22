@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Drishti Engine · engines by contract, proven with a JDK only.
+
+  Copyright (c) 2026 Ashutosh Sinha <ajsinha@gmail.com>.
+  All rights reserved.
+
+  PROPRIETARY AND CONFIDENTIAL.
+
+  This file is the confidential and proprietary property of Ashutosh Sinha.
+  Unauthorised copying, use, modification, distribution or disclosure of this
+  file, via any medium, is strictly prohibited except with the express prior
+  written permission of the copyright holder.
+
+  See the LICENSE file in the root of this repository for the full terms.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.ash.engine</groupId>
+    <artifactId>engine-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+  </parent>
+  <artifactId>engine-inputs-files</artifactId>
+  <name>Drishti Engine: engine-inputs-files</name>
+  <description>Inputs with no host: rows in memory delivered as a host would (batch size, order, the viewer's rows, grouped scans through a given evaluator), and a folder of JSONL files read into them. For an engine's tests, the kit and the command line; never inside a host. JDK and engine-api only.</description>
+  <properties>
+    <automatic.module.name>com.ash.engine.inputs</automatic.module.name>
+  </properties>
+  <dependencies>
+    <dependency><groupId>com.ash.engine</groupId><artifactId>engine-api</artifactId></dependency>
+  </dependencies>
+</project>

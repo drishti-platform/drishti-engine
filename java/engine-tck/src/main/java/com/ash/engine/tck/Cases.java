@@ -15,6 +15,7 @@
  */
 package com.ash.engine.tck;
 
+import com.ash.engine.inputs.RowInputs;
 import com.ash.engine.Filter;
 import com.ash.engine.text.Canonical;
 import com.ash.engine.text.StrictYaml;
@@ -193,9 +194,9 @@ public final class Cases {
         Map.Entry<String, Object> e = m.entrySet().iterator().next();
         List<Object> a = e.getValue() instanceof List<?> l ? (List<Object>) l : List.of(e.getValue());
         return switch (e.getKey()) {
-            case "eq" -> new Filter.Eq(String.valueOf(a.get(0)), MemoryInputs.text(a.get(1)));
-            case "in" -> new Filter.In(String.valueOf(a.get(0)), new TreeSet<>(((List<Object>) a.get(1)).stream().map(MemoryInputs::text).toList()));
-            case "range" -> new Filter.Range(String.valueOf(a.get(0)), MemoryInputs.text(a.get(1)), MemoryInputs.text(a.get(2)));
+            case "eq" -> new Filter.Eq(String.valueOf(a.get(0)), RowInputs.text(a.get(1)));
+            case "in" -> new Filter.In(String.valueOf(a.get(0)), new TreeSet<>(((List<Object>) a.get(1)).stream().map(RowInputs::text).toList()));
+            case "range" -> new Filter.Range(String.valueOf(a.get(0)), RowInputs.text(a.get(1)), RowInputs.text(a.get(2)));
             case "and" -> new Filter.And(a.stream().map(Cases::filter).toList());
             case "or" -> new Filter.Or(a.stream().map(Cases::filter).toList());
             case "not" -> new Filter.Not(filter(e.getValue()));

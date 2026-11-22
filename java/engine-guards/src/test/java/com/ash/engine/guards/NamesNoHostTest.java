@@ -37,7 +37,7 @@ class NamesNoHostTest {
     @Test
     void noModuleNamesAHost() {
         List<String> out = new ArrayList<>();
-        for (String m : List.of("engine-api", "engine-host", "engine-tck", "engine-sample")) {
+        for (String m : List.of("engine-api", "engine-host", "engine-inputs-files", "engine-tck", "engine-cli", "engine-sample")) {
             Path dir = Repo.JAVA.resolve(m);
             List<Path> files = new ArrayList<>(Repo.files(dir.resolve("src/main"), ".java", ".yaml", ".properties"));
             if (m.equals("engine-sample")) {

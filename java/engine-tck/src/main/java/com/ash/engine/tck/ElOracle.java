@@ -15,16 +15,22 @@
  */
 package com.ash.engine.tck;
 
+import com.ash.engine.inputs.Expressions;
 import java.util.Map;
 
 /**
  * The reference evaluator of Rachana-EL as the kit uses it: a step's formula over its given values and earlier steps, and a grouped
  * scan's row expressions. The kit's own engine is {@link RachanaEl}; an author never supplies one.
  */
-public interface ElOracle {
+public interface ElOracle extends Expressions {
 
     /** The value of {@code expression} over {@code document} (plain maps, lists and scalars): a Double, Long, String, Boolean, List or null. */
     Object eval(String expression, Map<String, Object> document);
+
+    @Override
+    default Object row(String expression, Map<String, Object> row) {
+        return eval(expression, row);
+    }
 
     /** The evaluator's name and version, for the report and the certificate. */
     String name();

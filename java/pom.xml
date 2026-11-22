@@ -26,7 +26,9 @@
     <module>engine-bom</module>
     <module>engine-api</module>
     <module>engine-host</module>
+    <module>engine-inputs-files</module>
     <module>engine-tck</module>
+    <module>engine-cli</module>
     <module>engine-sample</module>
     <module>engine-guards</module>
   </modules>
@@ -50,7 +52,9 @@
     <dependencies>
       <dependency><groupId>com.ash.engine</groupId><artifactId>engine-api</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>com.ash.engine</groupId><artifactId>engine-host</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.ash.engine</groupId><artifactId>engine-inputs-files</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>com.ash.engine</groupId><artifactId>engine-tck</artifactId><version>${project.version}</version></dependency>
+      <dependency><groupId>com.ash.engine</groupId><artifactId>engine-cli</artifactId><version>${project.version}</version></dependency>
       <dependency><groupId>com.ash.tools</groupId><artifactId>tools-bom</artifactId><version>${drishti.tools.version}</version><type>pom</type><scope>import</scope></dependency>
       <dependency><groupId>com.ash.rachana</groupId><artifactId>rachana-core</artifactId><version>${rachana.version}</version></dependency>
       <dependency><groupId>org.apache.poi</groupId><artifactId>poi-ooxml</artifactId><version>${poi.version}</version></dependency>

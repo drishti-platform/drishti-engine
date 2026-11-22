@@ -75,7 +75,14 @@ public final class StrictYaml {
         if (y.lines.isEmpty()) {
             return null;
         }
-        Object v = y.block(y.lines.get(0).indent());
+        Line first = y.lines.get(0);
+        Object v;
+        if (first.text().startsWith("{") || first.text().startsWith("[")) {
+            y.at = 1;                                          // a flow document: one JSON line reads the same way
+            v = y.value(first.text(), first, -1);
+        } else {
+            v = y.block(first.indent());
+        }
         if (y.at < y.lines.size()) {
             Line l = y.lines.get(y.at);
             throw error(l.no(), "unexpected indentation or content: " + l.text());

@@ -15,6 +15,7 @@
  */
 package com.ash.engine.tck;
 
+import com.ash.engine.inputs.RowInputs;
 import com.ash.engine.Answer;
 import com.ash.engine.Assembling;
 import com.ash.engine.Descriptor;
@@ -74,7 +75,7 @@ public final class Laws {
             out.add(compare(c, "batching", base, List.of(p.batch(1), p.batch(7), p.batch(4096)), "batches of 1, 7 and 4,096 rows"));
         }
         if (c.laws().runs("order") && d.inputs().values().stream().allMatch(i -> i.orderedBy().isEmpty())) {
-            out.add(compare(c, "order", base, List.of(p.order(MemoryInputs.Order.REVERSED, 0), p.order(MemoryInputs.Order.SHUFFLED, 42)),
+            out.add(compare(c, "order", base, List.of(p.order(RowInputs.Order.REVERSED, 0), p.order(RowInputs.Order.SHUFFLED, 42)),
                     "rows reversed and shuffled"));
         }
         Object derived = derivedVisibility(c);
@@ -162,7 +163,7 @@ public final class Laws {
             TreeSet<String> values = new TreeSet<>();
             rows.forEach(r -> {
                 if (r.get(col) != null) {
-                    values.add(MemoryInputs.text(r.get(col)));
+                    values.add(RowInputs.text(r.get(col)));
                 }
             });
             if (values.isEmpty()) {
@@ -187,7 +188,7 @@ public final class Laws {
         f.forEach((input, filter) -> {
             List<Map<String, Object>> rows = c.given().rows().get(input);
             if (rows != null) {
-                out.put(input, rows.stream().filter(r -> filter.test(col -> MemoryInputs.text(r.get(col)))).toList());
+                out.put(input, rows.stream().filter(r -> filter.test(col -> RowInputs.text(r.get(col)))).toList());
             }
         });
         return out;
@@ -203,7 +204,7 @@ public final class Laws {
         d.params().forEach((name, t) -> {
             Filter of = t.overlays() == null ? null : f.get(t.overlays());
             if (of != null && params.get(name) instanceof List<?> rows) {
-                params.put(name, rows.stream().filter(r -> r instanceof Map<?, ?> m && of.test(col -> MemoryInputs.text(m.get(col)))).toList());
+                params.put(name, rows.stream().filter(r -> r instanceof Map<?, ?> m && of.test(col -> RowInputs.text(m.get(col)))).toList());
             }
         });
         Outcome physical = host.run(c, KitHost.Variation.PLAIN.rows(reduced(c, v)).visibility("all").params(params));
@@ -289,9 +290,9 @@ public final class Laws {
         List<Map<String, Object>> rows = c.given().rows().get(part.input());
         TreeSet<String> values = new TreeSet<>();
         if (rows != null) {
-            rows.forEach(r -> values.add(MemoryInputs.text(r.get(part.unit()))));
+            rows.forEach(r -> values.add(RowInputs.text(r.get(part.unit()))));
         }
-        overlayRows(c, part.input()).forEach(r -> values.add(MemoryInputs.text(r.get(part.unit()))));
+        overlayRows(c, part.input()).forEach(r -> values.add(RowInputs.text(r.get(part.unit()))));
         values.remove(null);
         try (KitHost.Opened o = host.open(c, KitHost.Variation.PLAIN)) {
             if (!(o.session() instanceof Partitioned ps) || !(o.engine() instanceof Assembling as)) {

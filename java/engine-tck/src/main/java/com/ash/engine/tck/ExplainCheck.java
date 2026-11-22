@@ -15,6 +15,7 @@
  */
 package com.ash.engine.tck;
 
+import com.ash.engine.inputs.RowInputs;
 import com.ash.engine.Cell;
 import com.ash.engine.ColumnSchema;
 import com.ash.engine.Descriptor;
@@ -123,7 +124,7 @@ public final class ExplainCheck {
                     }
                     TreeMap<String, String> key = new TreeMap<>();
                     for (String k : out.key()) {
-                        key.put(k, MemoryInputs.text(t.value(k, row)));
+                        key.put(k, RowInputs.text(t.value(k, row)));
                     }
                     Cell cell = new Cell(t.schema().name(), col.name(), key);
                     HostControl ctl = o.control();

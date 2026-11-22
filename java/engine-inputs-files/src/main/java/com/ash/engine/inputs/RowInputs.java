@@ -13,7 +13,7 @@
  *
  * See the LICENSE file in the root of this repository for the full terms.
  */
-package com.ash.engine.tck;
+package com.ash.engine.inputs;
 
 import com.ash.engine.Aggregate;
 import com.ash.engine.Batch;
@@ -43,11 +43,11 @@ import java.util.TreeSet;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * The kit's {@link Inputs}: rows held in memory, delivered as a host would, under the variation a law asks for (batch size, order,
+ * {@link Inputs} over rows held in memory (maps of column to value, as read from JSONL or a kit case), delivered as a host would, under the variation a law asks for (batch size, order,
  * the viewer's rows only, push-down offered or refused). It records every column asked and refuses an undeclared one
  * ({@code ENG-2003}). Arrays of a batch are reused and overwritten after the sink returns, so an engine that keeps them is caught.
  */
-public final class MemoryInputs implements Inputs {
+public final class RowInputs implements Inputs {
 
     /** How rows are delivered. */
     public enum Order { NATURAL, REVERSED, SHUFFLED }
@@ -57,12 +57,17 @@ public final class MemoryInputs implements Inputs {
 
         /** The plain delivery: the engine's batch size, natural order, every row, push-down offered. */
         public static final Delivery PLAIN = new Delivery(0, Order.NATURAL, 0, Map.of(), true);
+
+        /** The same delivery with grouped scans refused. */
+        public Delivery withoutPushdown() {
+            return new Delivery(batchRows, order, shuffleSeed, viewer, false);
+        }
     }
 
     /** What the engine read: {@code input.COLUMN}, and undeclared asks. */
     public static final class Recorder {
-        final Set<String> read = ConcurrentHashMap.newKeySet();
-        final Set<String> undeclared = ConcurrentHashMap.newKeySet();
+        private final Set<String> read = ConcurrentHashMap.newKeySet();
+        private final Set<String> undeclared = ConcurrentHashMap.newKeySet();
 
         public Set<String> read() {
             return new TreeSet<>(read);
@@ -81,8 +86,8 @@ public final class MemoryInputs implements Inputs {
      * @param rows per input its rows (a null list: the table is absent)
      * @param openTables per open input, its tables by name
      */
-    public MemoryInputs(Descriptor d, Map<String, List<Map<String, Object>>> rows, Map<String, Map<String, List<Map<String, Object>>>> openTables,
-            Delivery delivery, Recorder recorder, ElOracle el) {
+    public RowInputs(Descriptor d, Map<String, List<Map<String, Object>>> rows, Map<String, Map<String, List<Map<String, Object>>>> openTables,
+            Delivery delivery, Recorder recorder, Expressions el) {
         this.descriptor = d;
         d.inputs().forEach((name, in) -> {
             if (!in.open()) {
@@ -128,7 +133,7 @@ public final class MemoryInputs implements Inputs {
     }
 
     /** Text of a cell as a filter reads it. */
-    static String text(Object v) {
+    public static String text(Object v) {
         if (v == null) {
             return null;
         }
@@ -146,11 +151,11 @@ public final class MemoryInputs implements Inputs {
         private final boolean present;
         private final Delivery delivery;
         private final Recorder recorder;
-        private final ElOracle el;
+        private final Expressions el;
         private final String stamp;
         private final Set<String> columns;
 
-        Table(String name, Descriptor.Input input, List<Map<String, Object>> all, boolean present, Delivery delivery, Recorder recorder, ElOracle el) {
+        Table(String name, Descriptor.Input input, List<Map<String, Object>> all, boolean present, Delivery delivery, Recorder recorder, Expressions el) {
             this.name = name;
             this.input = input;
             this.present = present;
@@ -227,7 +232,7 @@ public final class MemoryInputs implements Inputs {
             }
             List<Map<String, Object>> rs = ordered(scan.where());
             int size = batchSize(scan.batchRows());
-            KitBatch b = new KitBatch(scan.columns(), size);
+            RowBatch b = new RowBatch(scan.columns(), size);
             for (int from = 0; from < rs.size(); from += size) {
                 b.fill(rs.subList(from, Math.min(rs.size(), from + size)));
                 sink.batch(b);
@@ -290,7 +295,7 @@ public final class MemoryInputs implements Inputs {
             }
             List<Map<String, Object>> rs = new ArrayList<>();
             for (Map<String, Object> r : rows) {
-                if (scan.where() == null || truthy(el.eval(scan.where(), r))) {
+                if (scan.where() == null || truthy(el.row(scan.where(), r))) {
                     rs.add(r);
                 }
             }
@@ -309,10 +314,10 @@ public final class MemoryInputs implements Inputs {
                     Object[] states = groups.computeIfAbsent(key, k -> new Object[scan.aggregates().size()]);
                     for (int a = 0; a < states.length; a++) {
                         Aggregate ag = scan.aggregates().get(a);
-                        if (ag.where() != null && !truthy(el.eval(ag.where(), r))) {
+                        if (ag.where() != null && !truthy(el.row(ag.where(), r))) {
                             continue;
                         }
-                        Object x = ag.fn() == Aggregate.Fn.COUNT ? (Object) 1L : el.eval(ag.of(), r);
+                        Object x = ag.fn() == Aggregate.Fn.COUNT ? (Object) 1L : el.row(ag.of(), r);
                         states[a] = merge(ag.fn(), states[a], x);
                     }
                 }
@@ -332,7 +337,7 @@ public final class MemoryInputs implements Inputs {
                     out.add(row);
                 });
                 int size = batchSize(scan.batchRows() <= 0 ? 4096 : scan.batchRows());
-                KitBatch b = new KitBatch(cols, size);
+                RowBatch b = new RowBatch(cols, size);
                 for (int from = 0; from < out.size(); from += size) {
                     b.fill(out.subList(from, Math.min(out.size(), from + size)));
                     sink.batch(b);
@@ -382,25 +387,25 @@ public final class MemoryInputs implements Inputs {
     }
 
     /** A batch whose arrays are allocated once and reused; poisoned after each delivery. */
-    static final class KitBatch implements Batch {
+    public static final class RowBatch implements Batch {
         private final List<String> columns;
         private final int capacity;
         private List<Map<String, Object>> rows = List.of();
         private final Map<String, Object> arrays = new HashMap<>();
         private int n;
 
-        KitBatch(List<String> columns, int capacity) {
+        public RowBatch(List<String> columns, int capacity) {
             this.columns = List.copyOf(columns);
             this.capacity = capacity;
         }
 
-        void fill(List<Map<String, Object>> rs) {
+        public void fill(List<Map<String, Object>> rs) {
             rows = rs;
             n = rs.size();
             arrays.clear();
         }
 
-        void poison() {
+        public void poison() {
             for (Object a : arrays.values()) {
                 if (a instanceof double[] d) {
                     java.util.Arrays.fill(d, Double.NaN);

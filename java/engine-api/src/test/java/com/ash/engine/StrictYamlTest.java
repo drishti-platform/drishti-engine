@@ -68,4 +68,13 @@ class StrictYamlTest {
         Map<String, Object> m = StrictYaml.readMap("cases:\n- id: one\n  x: 1\n- id: two\n");
         assertThat((List<?>) m.get("cases")).hasSize(2);
     }
+
+    @Test
+    void aJsonLineIsAFlowDocument() {
+        Map<String, Object> m = StrictYaml.readMap("{\"a\":1,\"b\":\"x:y\",\"c\":[1.5,true,null],\"d\":{\"e\":\"\\u00e9\"}}");
+        assertThat(m.get("a")).isEqualTo(1L);
+        assertThat(m.get("b")).isEqualTo("x:y");
+        assertThat((List<?>) m.get("c")).containsExactly(1.5, true, null);
+        assertThat(((Map<?, ?>) m.get("d")).get("e")).isEqualTo("\u00e9");
+    }
 }

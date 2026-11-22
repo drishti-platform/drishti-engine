@@ -30,6 +30,8 @@ final class Repo {
     static final List<List<String>> MODULES = List.of(
             List.of("engine-api", "com.ash.engine", "com.ash.engine.text"),
             List.of("engine-host", "com.ash.engine.host"),
+            List.of("engine-inputs-files", "com.ash.engine.inputs"),
+            List.of("engine-cli", "com.ash.engine.cli"),
             List.of("engine-tck", "com.ash.engine.tck"));
 
     private Repo() {

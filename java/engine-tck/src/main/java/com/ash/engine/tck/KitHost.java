@@ -15,6 +15,7 @@
  */
 package com.ash.engine.tck;
 
+import com.ash.engine.inputs.RowInputs;
 import com.ash.engine.Answer;
 import com.ash.engine.Changes;
 import com.ash.engine.Descriptor;
@@ -103,16 +104,16 @@ public final class KitHost {
      * The host's choices for one run. {@code rows}: replaces the case's rows for the inputs it names (a physically changed input);
      * {@code visibility}: replaces the case's ({@code all} or a filter spec); {@code perViewer}: read every input as the viewer.
      */
-    public record Variation(int threads, int batchRows, MemoryInputs.Order order, long shuffleSeed, boolean perViewer, boolean pushdown,
+    public record Variation(int threads, int batchRows, RowInputs.Order order, long shuffleSeed, boolean perViewer, boolean pushdown,
             boolean keepInterim, Long seed, Map<String, List<Map<String, Object>>> rows, Object visibility, long budget,
             Map<String, Object> options, Map<String, Object> params) {
 
-        public static final Variation PLAIN = new Variation(2, 0, MemoryInputs.Order.NATURAL, 0, false, true, true, null, Map.of(), null,
+        public static final Variation PLAIN = new Variation(2, 0, RowInputs.Order.NATURAL, 0, false, true, true, null, Map.of(), null,
                 1L << 30, Map.of(), null);
 
         public Variation threads(int n) { return new Variation(n, batchRows, order, shuffleSeed, perViewer, pushdown, keepInterim, seed, rows, visibility, budget, options, params); }
         public Variation batch(int n) { return new Variation(threads, n, order, shuffleSeed, perViewer, pushdown, keepInterim, seed, rows, visibility, budget, options, params); }
-        public Variation order(MemoryInputs.Order o, long s) { return new Variation(threads, batchRows, o, s, perViewer, pushdown, keepInterim, seed, rows, visibility, budget, options, params); }
+        public Variation order(RowInputs.Order o, long s) { return new Variation(threads, batchRows, o, s, perViewer, pushdown, keepInterim, seed, rows, visibility, budget, options, params); }
         public Variation perViewer(boolean b) { return new Variation(threads, batchRows, order, shuffleSeed, b, pushdown, keepInterim, seed, rows, visibility, budget, options, params); }
         public Variation pushdown(boolean b) { return new Variation(threads, batchRows, order, shuffleSeed, perViewer, b, keepInterim, seed, rows, visibility, budget, options, params); }
         public Variation keepInterim(boolean b) { return new Variation(threads, batchRows, order, shuffleSeed, perViewer, pushdown, b, seed, rows, visibility, budget, options, params); }
@@ -127,7 +128,7 @@ public final class KitHost {
     private final Subject subject;
     private final Path workRoot;
     private final ElOracle el;
-    private final MemoryInputs.Recorder recorder = new MemoryInputs.Recorder();
+    private final RowInputs.Recorder recorder = new RowInputs.Recorder();
     private final AtomicInteger folders = new AtomicInteger();
 
     public KitHost(Subject subject, Path workRoot, ElOracle el) {
@@ -145,7 +146,7 @@ public final class KitHost {
     }
 
     /** Every column read and every undeclared column asked, over every run of this host. */
-    public MemoryInputs.Recorder recorder() {
+    public RowInputs.Recorder recorder() {
         return recorder;
     }
 
@@ -196,9 +197,9 @@ public final class KitHost {
         rows.putAll(v.rows());
         Snapshot snapshot = Snapshot.of(c.given().snapshot());
         Map<String, Filter> viewer = viewer(d, v.visibility() != null ? v.visibility() : c.request().visibility(), v.perViewer());
-        MemoryInputs inputs = new MemoryInputs(d, rows, c.given().openTables(),
-                new MemoryInputs.Delivery(v.batchRows(), v.order(), v.shuffleSeed(), viewer, v.pushdown()), recorder, el);
-        Map<String, MemoryInputs> bySnapshot = new HashMap<>();
+        RowInputs inputs = new RowInputs(d, rows, c.given().openTables(),
+                new RowInputs.Delivery(v.batchRows(), v.order(), v.shuffleSeed(), viewer, v.pushdown()), recorder, el);
+        Map<String, RowInputs> bySnapshot = new HashMap<>();
         bySnapshot.put(snapshot.text(), inputs);
         Instant now = c.given().snapshot().values().stream().filter(s -> s.matches("\\d{4}-\\d{2}-\\d{2}")).findFirst()
                 .map(s -> Instant.parse(s + "T12:00:00Z")).orElse(Instant.parse("2026-01-01T12:00:00Z"));
@@ -272,12 +273,12 @@ public final class KitHost {
         private final Path work;
         private final Map<String, List<Map<String, Object>>> rows;
         private final Snapshot snapshot;
-        private final Map<String, MemoryInputs> bySnapshot;
+        private final Map<String, RowInputs> bySnapshot;
         Session session;
         private boolean closed;
 
         Opened(KitHost host, Cases.Case c, Variation v, Engine engine, HostContext ctx, ExecutorService ex, Path work,
-                Map<String, List<Map<String, Object>>> rows, Snapshot snapshot, Map<String, MemoryInputs> bySnapshot) {
+                Map<String, List<Map<String, Object>>> rows, Snapshot snapshot, Map<String, RowInputs> bySnapshot) {
             this.host = host;
             this.c = c;
             this.v = v;
@@ -350,12 +351,12 @@ public final class KitHost {
                     List<Map<String, Object>> ups = ch.get("upserts") == null ? List.of() : (List<Map<String, Object>>) ch.get("upserts");
                     @SuppressWarnings("unchecked")
                     List<Object> del = ch.get("deleted") == null ? List.of() : (List<Object>) ch.get("deleted");
-                    MemoryInputs.KitBatch b = new MemoryInputs.KitBatch(d.inputs().get(input).columns(), Math.max(1, ups.size()));
+                    RowInputs.RowBatch b = new RowInputs.RowBatch(d.inputs().get(input).columns(), Math.max(1, ups.size()));
                     b.fill(ups);
-                    list.add(new Changes(input, b, del.stream().map(MemoryInputs::text).toList(), "changed-" + (++n)));
+                    list.add(new Changes(input, b, del.stream().map(RowInputs::text).toList(), "changed-" + (++n)));
                 }
                 boolean ok = host.within(() -> inc.apply(list, control()));
-                MemoryInputs now = new MemoryInputs(d, changed, c.given().openTables(), new MemoryInputs.Delivery(v.batchRows(), v.order(),
+                RowInputs now = new RowInputs(d, changed, c.given().openTables(), new RowInputs.Delivery(v.batchRows(), v.order(),
                         v.shuffleSeed(), viewer(d, caseVisibility(), v.perViewer()), v.pushdown()), host.recorder(), host.el);
                 bySnapshot.put(snapshot.text(), now);
                 if (!ok) {
@@ -406,7 +407,7 @@ public final class KitHost {
             List<Map<String, Object>> rs = new ArrayList<>(out.getOrDefault(input, List.of()) == null ? List.of() : out.get(input));
             List<Object> del = ch.get("deleted") == null ? List.of() : (List<Object>) ch.get("deleted");
             for (Object k : del) {
-                rs.removeIf(r -> keyOf(key, r).equals(MemoryInputs.text(k)));
+                rs.removeIf(r -> keyOf(key, r).equals(RowInputs.text(k)));
             }
             for (Map<String, Object> up : ch.get("upserts") == null ? List.<Map<String, Object>>of() : (List<Map<String, Object>>) ch.get("upserts")) {
                 int at = -1;
@@ -427,7 +428,7 @@ public final class KitHost {
     }
 
     static String keyOf(List<String> key, Map<String, Object> row) {
-        return String.join("|", key.stream().map(k -> MemoryInputs.text(row.get(k))).toList());
+        return String.join("|", key.stream().map(k -> RowInputs.text(row.get(k))).toList());
     }
 
     static void deleteTree(Path p) {

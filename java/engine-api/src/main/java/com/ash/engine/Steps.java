@@ -25,8 +25,8 @@ public final class Steps {
     }
 
     /** A step with a Rachana-EL formula over {@code given} (and earlier steps as {@code step.<name>}) and the engine's own value. */
-    public static Step of(String name, String label, String formula, Map<String, Object> given, Object value) {
-        return new Step(name, label, formula, new TreeMap<>(given), value, false, null, null);
+    public static Step of(String name, String label, String formula, Map<String, ?> given, Object value) {
+        return new Step(name, label, formula, new TreeMap<String, Object>(given), value, false, null, null);
     }
 
     /** A step not expressible in EL: why, and the workbook cell that holds it. Counted by the kit; an engine SHOULD have none. */

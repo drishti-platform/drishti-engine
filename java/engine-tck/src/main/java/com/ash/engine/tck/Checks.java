@@ -15,6 +15,7 @@
  */
 package com.ash.engine.tck;
 
+import com.ash.engine.inputs.RowInputs;
 import com.ash.engine.Answer;
 import com.ash.engine.Assembling;
 import com.ash.engine.ColumnSchema;
@@ -253,7 +254,7 @@ public final class Checks {
         }
     }
 
-    private static MemoryInputs inputsOf(KitHost host, Cases.Case c) {
-        return new MemoryInputs(host.descriptor(), c.given().rows(), c.given().openTables(), MemoryInputs.Delivery.PLAIN, host.recorder(), null);
+    private static RowInputs inputsOf(KitHost host, Cases.Case c) {
+        return new RowInputs(host.descriptor(), c.given().rows(), c.given().openTables(), RowInputs.Delivery.PLAIN, host.recorder(), null);
     }
 }
