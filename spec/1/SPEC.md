@@ -89,7 +89,7 @@ changes ───────────────▶ │     apply(changes) 
 | **contract** | a table's definition in the Lake contract schema, named `<owner>/<name>@<major>` |
 | **input** | a named table the engine reads, of one contract |
 | **snapshot** | the values of the dimensions the descriptor declares (`{ date: 2026-01-13 }`, `{ cohort: C1 }`, or none), fixing which rows of each input are meant |
-| **session** | the engine's loaded state for one snapshot; opened and closed by the host; answers any number of requests |
+| **session** | the engine's loaded state for one snapshot; opened and closed by the host, only while the engine is running; answers any number of requests |
 | **request** | which outputs, with which parameters, for which visibility |
 | **output** | a named table the engine answers with; its schema is in the descriptor |
 | **measure** | an output column marked `measure: true`: a figure that MUST be explainable |
@@ -256,12 +256,21 @@ of 4.3 are the only others an engine ever implements.
 ### 4.1 `Engine` (required)
 
 ```java
-public interface Engine extends AutoCloseable {
+public interface Engine {
     /** The descriptor, read from the jar's own file. MUST equal that file. */
     Descriptor descriptor();
 
-    /** Called once. Options are already valid against the descriptor. Refuse with EngineException (the reason is shown). */
-    void open(EngineContext context) throws EngineException;
+    /** First call, once. Reads and validates the descriptor and options in the context; acquires no heavy resource. Refuse with EngineException (the reason is shown). */
+    void init(EngineContext context) throws EngineException;
+
+    /** Acquires resources (native libraries, caches, work files) and warms them. Sessions exist only while the engine is running. */
+    void start() throws EngineException;
+
+    /** Stops taking new work, keeps all state. The host has already stopped admitting and drained or cancelled calls in flight. MUST be cheap. */
+    void suspend() throws EngineException;
+
+    /** Back to running from suspend; cheap; no reload; the same answers, bit for bit. */
+    void resume() throws EngineException;
 
     /**
      * Opens the loaded state for one snapshot. The engine reads what it keeps from `inputs` now or lazily at the first ask
@@ -273,8 +282,8 @@ public interface Engine extends AutoCloseable {
     /** Status words for a host's administrator (a native library loaded, or fallen back to Java). Cheap; never row values. */
     default List<String> notes() { return List.of(); }
 
-    /** Releases everything. Sessions are already closed. */
-    @Override void close();
+    /** Releases everything (threads, files, native handles, memory). Sessions are already closed. Any state; idempotent. */
+    void shutdown();
 }
 ```
 
@@ -660,14 +669,33 @@ handed through unchanged (a host masks it for a viewer who has that input column
 
 ### 7.1 Engine instance
 
+Every engine implements five lifecycle methods: `init`, `start`, `suspend`, `resume`, `shutdown`. The host owns the state
+(`com.ash.engine.LifecycleState`) and calls them in order.
+
 | State | Entered by | Allowed next |
 |---|---|---|
-| `NEW` | construction | `open` → `OPEN`; `close` → `CLOSED` |
-| `OPEN` | `open` returned | `session`, `assemble`; `close` → `CLOSED` |
-| `FAILED` | `open` threw | `close` → `CLOSED` |
-| `CLOSED` | `close` returned | none; a further `close` MUST be harmless |
+| `NEW` | construction | `init` → `INITIALISED` (or `FAILED`); `shutdown` → `SHUTDOWN` |
+| `INITIALISED` | `init` returned | `start` → `RUNNING` (or `FAILED`); `shutdown` → `SHUTDOWN` |
+| `RUNNING` | `start` or `resume` returned | `session`, `ask` and the other calls of 7.2; `suspend` → `SUSPENDED`; `shutdown` → `SHUTDOWN` |
+| `SUSPENDED` | `suspend` returned | `resume` → `RUNNING`; `shutdown` → `SHUTDOWN` |
+| `FAILED` | `init`, `start`, `suspend` or `resume` threw | `shutdown` → `SHUTDOWN` |
+| `SHUTDOWN` | `shutdown` returned | none; a further `shutdown` MUST be harmless |
 
-A host MUST call `open` exactly once, MUST close every session before `close`, and MUST NOT call anything after `close`.
+1. `init(EngineContext)` reads and validates the descriptor and the options, keeps the context, and acquires no thread, no file, no
+   native library and no large memory. It is called exactly once.
+2. `start()` acquires the resources and warms the caches. Sessions are opened only while the instance is `RUNNING`.
+3. `suspend()`: the host first stops admitting requests and new sessions, then lets requests in flight finish within the descriptor's
+   `cancel-latency` or cancels them through `Control`, then calls `suspend`. The engine keeps all state, loaded data and resources;
+   open sessions stay open and keep their memory. `suspend` and `resume` MUST be cheap: no reload, no release of loaded data, within
+   twice the declared cancel-latency plus 50 ms. [K]
+4. `resume()` returns to `RUNNING`; nothing is lost, and the same request gets the same answer, bit for bit. [K]
+5. `shutdown()` closes every session first (the host's duty), then releases everything. It is allowed in any state, also after a failed
+   `init`, and is idempotent. After it no thread of the engine runs and no file of the engine remains under `workDir()`. [K]
+6. An illegal call (`start` on `NEW`, `resume` on `RUNNING`, `init` twice, anything after `SHUTDOWN` but `shutdown`) is refused by the host as
+   `ENG-5020` (`REFUSED`) and changes nothing. A request or a session on a `SUSPENDED` instance is refused as `ENG-5023` (`REFUSED`) with
+   the word "suspended" and, when given, the reason (an administrator's, a licence's or a version's). The engine is not asked.
+7. A host suspends for an administrator's request and when a licence or a version change makes the engine's `product` or version
+   unavailable until it is renewed or replaced; it resumes when the cause is gone. A replaced version is a `shutdown` and a new instance.
 
 ### 7.2 Session
 
@@ -1048,6 +1076,7 @@ public final class EngineException extends Exception {
 | `ENG-5011` | TIMED_OUT | the deadline passed |
 | `ENG-5020` | REFUSED | a call in a state that does not allow it (section 7) |
 | `ENG-5021` | REFUSED | partials that do not belong together |
+| `ENG-5023` | REFUSED | the engine is suspended (the words say "suspended" and why) |
 | `ENG-5030` | UNAVAILABLE | the engine is not installed on this server |
 | `ENG-5031` | UNAVAILABLE | the engine is off (who, when, why) |
 | `ENG-5032` | UNAVAILABLE | the engine is blocked (the start check that failed) |
@@ -1321,7 +1350,10 @@ public final class WmeanEngine implements Engine, Assembling {
     private EngineContext context;
 
     @Override public Descriptor descriptor() { return Descriptors.of(WmeanEngine.class, "wmean"); }
-    @Override public void open(EngineContext context) { this.context = context; }
+    @Override public void init(EngineContext context) { this.context = context; }
+    @Override public void start() { }       // nothing to acquire
+    @Override public void suspend() { }     // everything is kept
+    @Override public void resume() { }
 
     @Override public Session session(Snapshot snapshot, Inputs inputs, Control control) throws EngineException {
         InputTable t = inputs.table("observations");
@@ -1341,7 +1373,7 @@ public final class WmeanEngine implements Engine, Assembling {
     @Override public Answer assemble(Request request, List<Partial> partials, Control control) {
         return WmeanSession.finish(request, Sums.merge(partials), context);   // groups are disjoint across shards
     }
-    @Override public void close() { }
+    @Override public void shutdown() { context = null; }
 }
 
 final class WmeanSession implements Session, Explaining, Incremental, Partitioned {
@@ -1470,7 +1502,7 @@ descriptor   wmean 1.0.0  ok        scan  0 findings
 cases        6 of 6
 laws         repeat 5  threads 5  batching 5  order 5  filter-equivalence 5  interleaving 5
              incremental 5  additivity 5  absence 0 (no optional input)  seed 5  explain 8 cells  binding - (not declared)
-lifecycle    states ok  two instances ok  close: 0 bytes, 0 tasks  cancel 41 ms (declared 200 ms)  1 MB budget: ENG-5002, then ok
+lifecycle    states ok  suspend/resume ok  two instances ok  shutdown: 0 bytes, 0 tasks, 0 files  cancel 41 ms (declared 200 ms)  1 MB budget: ENG-5002, then ok
 explain      8 cells, 24 steps, 0 opaque; workbook recalculated: 8 of 8 equal
 gates        coverage ok  additive-only: no previous release  oracles ok  stable over two runs
 certificate  target/tck/wmean-engine-1.0.0.jar.certificate.json

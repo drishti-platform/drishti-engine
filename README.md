@@ -62,7 +62,7 @@ runs give the same bytes), `report.md`, and, when everything held, `<jar>.certif
 | cases | each case's `expect`, doubles by raw bits |
 | laws | repeat, threads, batching, order, filter-equivalence, interleaving, incremental, additivity, absence, seed, explain, overlay, pushdown, interim, isolation (binding: an engine that lists `process` fails this kit) |
 | explain | every measure cell explained; every formula recomputed by Rachana's evaluator; the workbook's defined names recalculated by Apache POI and equal to the cells; cached values equal; the same bytes twice |
-| lifecycle | close is harmless twice; a closed session holds nothing; two instances apart; cancel and deadline within the declared latency; a one-byte budget is `ENG-5002` in words and the engine stays usable |
+| lifecycle | init, start, suspend, resume and shutdown: every legal transition, illegal ones `ENG-5020`, a suspended engine `ENG-5023` and suspend then resume keep answers bit-identical and cheap; shutdown is harmless twice and leaves no thread or file; a closed session holds nothing; two instances apart; cancel and deadline within the declared latency; a one-byte budget is `ENG-5002` in words and the engine stays usable |
 | gates | coverage (outputs, enumerated values, every declared column read, own codes, `NOT_FOUND` per required input); additive only (`--previous`); oracles (every case has a `source`); stable (the run twice, one set of lines) |
 
 The **harness** is for an author's own unit tests: `EngineHarness.of(MyEngine.class).snapshot(..).rows(input, rows).open()` gives a

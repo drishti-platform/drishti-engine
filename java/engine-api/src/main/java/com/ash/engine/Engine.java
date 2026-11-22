@@ -22,13 +22,32 @@ import java.util.List;
  * with a public constructor without parameters that does no work. The engine starts no thread, keeps no timer, reads no clock but the
  * context's, and holds nothing derived from a request.
  */
-public interface Engine extends AutoCloseable {
+public interface Engine {
 
     /** The descriptor, read from the jar's own file ({@link Descriptors#of}). MUST equal that file. */
     Descriptor descriptor();
 
-    /** Called once. Options are already valid against the descriptor. Refuse with an EngineException (the reason is shown). */
-    void open(EngineContext context) throws EngineException;
+    /**
+     * First call, once. Reads the descriptor and the options in {@code context}, validates them, keeps the context. Acquires no thread,
+     * file, native library or large memory (that is {@link #start}). Refuse with an EngineException (the reason is shown).
+     */
+    void init(EngineContext context) throws EngineException;
+
+    /**
+     * After {@link #init}: acquires resources (native libraries,
+     * caches, work files) and warms what it will use. Sessions are opened only while the engine is running.
+     */
+    void start() throws EngineException;
+
+    /**
+     * Stops taking new work. The host has already stopped admitting requests and sessions and has let calls in flight finish within the
+     * declared cancel-latency (or cancelled them through {@code Control}); the engine keeps all its state and resources. MUST be cheap:
+     * no reload, no release of loaded data.
+     */
+    void suspend() throws EngineException;
+
+    /** Back to running from {@link #suspend}; cheap; nothing is reloaded and no answer changes (the same bits as before the suspend). */
+    void resume() throws EngineException;
 
     /**
      * Opens the loaded state for one snapshot. The engine reads what it keeps from {@code inputs} now or lazily at the first ask (memory
@@ -42,7 +61,9 @@ public interface Engine extends AutoCloseable {
         return List.of();
     }
 
-    /** Releases everything. Sessions are already closed. */
-    @Override
-    void close();
+    /**
+     * Releases everything: threads, files, native handles, memory. Sessions are already closed. Callable in any state, also after a
+     * failed {@link #init}, and idempotent: a second call does nothing and does not throw.
+     */
+    void shutdown();
 }

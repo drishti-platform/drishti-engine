@@ -41,7 +41,7 @@ public final class GroupTotalsEngine implements Engine {
     }
 
     @Override
-    public void open(EngineContext context) {
+    public void init(EngineContext context) {
         this.context = context;
     }
 
@@ -51,7 +51,22 @@ public final class GroupTotalsEngine implements Engine {
     }
 
     @Override
-    public void close() {
+    public void start() {
+        // nothing to acquire: no thread, no file, no native library, no cache
+    }
+
+    @Override
+    public void suspend() {
+        // everything is kept; the host refuses new requests and sessions while suspended
+    }
+
+    @Override
+    public void resume() {
+        // nothing was released, so nothing is reloaded
+    }
+
+    @Override
+    public void shutdown() {
         context = null;
     }
 }

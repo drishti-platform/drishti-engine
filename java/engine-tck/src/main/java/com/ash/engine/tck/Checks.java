@@ -53,7 +53,7 @@ public final class Checks {
             Engine e = host.within(() -> host.subject().create());
             Descriptor said = host.within(e::descriptor);
             host.within(() -> {
-                e.close();
+                e.shutdown();
                 return null;
             });
             out.add(Result.of("descriptor", d.id(), "equals the file", said.equals(d) ? null : "Engine.descriptor() differs from the descriptor file", null));
@@ -141,7 +141,7 @@ public final class Checks {
     }
 
     /**
-     * The lifecycle group on one case: close twice is harmless, a closed session holds nothing, two instances are apart, a cancelled or
+     * The lifecycle group on one case: shutdown twice is harmless, a closed session holds nothing, two instances are apart, a cancelled or
      * late request stops within the declared latency, a budget too small is a refusal in words and the engine stays usable.
      */
     public static List<Result> lifecycle(KitHost host, Cases.Case c, Outcome base) {
@@ -151,14 +151,15 @@ public final class Checks {
         try {
             Engine never = host.within(() -> host.subject().create());
             host.within(() -> {
-                never.close();
-                never.close();
+                never.shutdown();
+                never.shutdown();
                 return null;
             });
-            out.add(Result.ok("lifecycle", s, "close without open", "harmless, twice"));
+            out.add(Result.ok("lifecycle", s, "shutdown without init", "harmless, twice"));
         } catch (Exception e) {
-            out.add(Result.fail("lifecycle", s, "close without open", e.toString()));
+            out.add(Result.fail("lifecycle", s, "shutdown without init", e.toString()));
         }
+        out.addAll(Lifecycle.law(host, c, base));
         try (KitHost.Opened a = host.open(c, KitHost.Variation.PLAIN); KitHost.Opened b = host.open(c, KitHost.Variation.PLAIN)) {
             out.add(sessionCapabilities(d, a.session(), s));
             if (!c.changes().isEmpty()) {
@@ -254,7 +255,7 @@ public final class Checks {
         }
     }
 
-    private static RowInputs inputsOf(KitHost host, Cases.Case c) {
+    static RowInputs inputsOf(KitHost host, Cases.Case c) {
         return new RowInputs(host.descriptor(), c.given().rows(), c.given().openTables(), RowInputs.Delivery.PLAIN, host.recorder(), null);
     }
 }

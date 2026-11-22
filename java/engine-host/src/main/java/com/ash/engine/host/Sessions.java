@@ -74,6 +74,7 @@ public final class Sessions implements AutoCloseable {
 
     /** The session of {@code key}, opened when there is none; the caller closes the lease when its call ends. */
     public Lease lease(Key key, Control control) throws EngineException {
+        instance.admit();                                                  // suspended: ENG-5023, even for a session already open
         Entry e;
         synchronized (this) {
             if (closed) {

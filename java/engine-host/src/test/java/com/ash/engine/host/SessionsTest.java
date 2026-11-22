@@ -38,7 +38,10 @@ class SessionsTest {
         final AtomicInteger closed = new AtomicInteger();
 
         @Override public Descriptor descriptor() { return null; }
-        @Override public void open(EngineContext context) { }
+        @Override public void init(EngineContext context) { }
+        @Override public void start() { }
+        @Override public void suspend() { }
+        @Override public void resume() { }
         @Override public Session session(Snapshot snapshot, Inputs inputs, Control control) {
             opened.incrementAndGet();
             return new Session() {
@@ -48,7 +51,7 @@ class SessionsTest {
                 @Override public void close() { closed.incrementAndGet(); }
             };
         }
-        @Override public void close() { }
+        @Override public void shutdown() { }
     }
 
     private static Sessions.Key key(String date) {
@@ -59,7 +62,7 @@ class SessionsTest {
     void oneSessionPerKeyKeptWhileHotAllowsAndNeverClosedWhileLeased() throws Exception {
         Counting c = new Counting();
         EngineInstance inst = new EngineInstance("count", c, getClass().getClassLoader());
-        inst.open(null);
+        inst.boot(null);
         try (Sessions s = new Sessions(inst, 2, k -> null)) {
             Sessions.Lease a = s.lease(key("2026-01-13"), HostControl.open());
             s.lease(key("2026-01-13"), HostControl.open()).close();

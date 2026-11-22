@@ -13,6 +13,7 @@
  *
  * See the LICENSE file in the root of this repository for the full terms.
  */
+package com.ash.engine;
 package com.ash.engine.host;
 
 import com.ash.engine.Control;
@@ -21,24 +22,28 @@ import com.ash.engine.EngineContext;
 import com.ash.engine.EngineException;
 import com.ash.engine.EngineException.Kind;
 import com.ash.engine.Inputs;
+import com.ash.engine.LifecycleState;
 import com.ash.engine.Session;
 import com.ash.engine.Snapshot;
+import java.time.Duration;
+import java.util.Map;
 import java.util.concurrent.Callable;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
- * One engine instance and its lifecycle (specification 7.1): NEW, OPEN, FAILED, CLOSED. Every call into the engine runs with the
- * engine's loader as the thread's context loader. A call in a state that does not allow it is {@code ENG-5020}.
+ * One engine instance and its lifecycle (specification 7.1): init, start, suspend, resume, shutdown. Every call into the engine runs
+ * with the engine's loader as the thread's context loader. A call in a state that does not allow it is {@code ENG-5020}; a request or
+ * a session on a suspended instance is {@code ENG-5023} ("suspended").
  */
 public final class EngineInstance implements AutoCloseable {
-
-    /** The instance's state. */
-    public enum State { NEW, OPEN, FAILED, CLOSED }
 
     private final Engine engine;
     private final ClassLoader loader;
     private final String id;
-    private volatile State state = State.NEW;
+    private final AtomicInteger inFlight = new AtomicInteger();
+    private volatile LifecycleState state = LifecycleState.NEW;
     private volatile String failure;
+    private volatile String reason;
 
     public EngineInstance(String id, Engine engine, ClassLoader loader) {
         this.id = id;
@@ -46,47 +51,144 @@ public final class EngineInstance implements AutoCloseable {
         this.loader = loader;
     }
 
-    public State state() {
+    public LifecycleState state() {
         return state;
     }
 
-    /** Why open failed, in the engine's words (null when it did not). */
+    /** Why init failed, in the engine's words (null when it did not). */
     public String failure() {
         return failure;
+    }
+
+    /** Why the instance is suspended (the administrator's or the licence's words), null when it is not. */
+    public String suspendedBecause() {
+        return state == LifecycleState.SUSPENDED ? reason : null;
     }
 
     public Engine engine() {
         return engine;
     }
 
-    /** Opens the instance once; a refusal leaves it FAILED with the engine's words. */
-    public synchronized void open(EngineContext context) throws EngineException {
-        if (state != State.NEW) {
-            throw new EngineException("ENG-5020", Kind.REFUSED, id + " is " + state + "; open is called once, on a new instance");
-        }
+    /** Requests running now (calls made through {@link #request}). */
+    public int inFlight() {
+        return inFlight.get();
+    }
+
+    /** NEW to INITIALISED; a refusal leaves it FAILED with the engine's words. */
+    public synchronized void init(EngineContext context) throws EngineException {
+        require(LifecycleState.NEW, "init");
         try {
             within(() -> {
-                engine.open(context);
+                engine.init(context);
                 return null;
             });
-            state = State.OPEN;
+            state = LifecycleState.INITIALISED;
         } catch (EngineException e) {
-            state = State.FAILED;
+            state = LifecycleState.FAILED;
             failure = e.getMessage();
             throw e;
-        } catch (Exception | LinkageError e) {
-            state = State.FAILED;
-            failure = "the engine failed to open";
-            throw new EngineException("ENG-9000", Kind.FAILED, id + " failed to open", java.util.Map.of(), e);
         }
     }
 
-    /** A session of the open instance. */
-    public Session session(Snapshot snapshot, Inputs inputs, Control control) throws EngineException {
-        if (state != State.OPEN) {
-            throw new EngineException("ENG-5020", Kind.REFUSED, id + " is " + state + "; a session needs an open instance");
+    /** INITIALISED to RUNNING; a refusal leaves it FAILED (only shutdown follows). */
+    public synchronized void start() throws EngineException {
+        require(LifecycleState.INITIALISED, "start");
+        try {
+            within(() -> {
+                engine.start();
+                return null;
+            });
+            state = LifecycleState.RUNNING;
+        } catch (EngineException e) {
+            state = LifecycleState.FAILED;
+            failure = e.getMessage();
+            throw e;
         }
+    }
+
+    /** init then start, for a host that has nothing to do between them. */
+    public void boot(EngineContext context) throws EngineException {
+        init(context);
+        start();
+    }
+
+    /**
+     * RUNNING to SUSPENDED. New requests and sessions are refused from the first moment; requests in flight get {@code grace} (the
+     * descriptor's cancel-latency) to finish, then {@code cancelInFlight} runs (the host cancels them through their Control) and they
+     * get {@code grace} again; then the engine's {@code suspend} is called. State and resources stay.
+     */
+    public void suspend(String why, Duration grace, Runnable cancelInFlight) throws EngineException {
+        synchronized (this) {
+            require(LifecycleState.RUNNING, "suspend");
+            reason = why == null || why.isBlank() ? "suspended by the administrator" : why;
+            state = LifecycleState.SUSPENDED;                              // the gate: request() and session() refuse from here
+        }
+        drain(grace);
+        if (inFlight.get() > 0 && cancelInFlight != null) {
+            cancelInFlight.run();
+            drain(grace);
+        }
+        synchronized (this) {
+            if (state != LifecycleState.SUSPENDED) {
+                return;                                                    // shut down meanwhile
+            }
+            try {
+                within(() -> {
+                    engine.suspend();
+                    return null;
+                });
+            } catch (EngineException e) {
+                state = LifecycleState.FAILED;
+                failure = e.getMessage();
+                throw e;
+            }
+        }
+    }
+
+    /** SUSPENDED to RUNNING; cheap. */
+    public synchronized void resume() throws EngineException {
+        require(LifecycleState.SUSPENDED, "resume");
+        try {
+            within(() -> {
+                engine.resume();
+                return null;
+            });
+            reason = null;
+            state = LifecycleState.RUNNING;
+        } catch (EngineException e) {
+            state = LifecycleState.FAILED;
+            failure = e.getMessage();
+            throw e;
+        }
+    }
+
+    /** A session of the running instance. */
+    public Session session(Snapshot snapshot, Inputs inputs, Control control) throws EngineException {
+        admit();
         return within(() -> engine.session(snapshot, inputs, control));
+    }
+
+    /** Throws {@code ENG-5023} when suspended, {@code ENG-5020} when not running at all; returns when requests are served. */
+    public void admit() throws EngineException {
+        LifecycleState s = state;
+        if (s == LifecycleState.RUNNING) {
+            return;
+        }
+        if (s == LifecycleState.SUSPENDED) {
+            throw new EngineException("ENG-5023", Kind.REFUSED, id + " is suspended" + (reason == null ? "" : ": " + reason));
+        }
+        throw new EngineException("ENG-5020", Kind.REFUSED, id + " is " + s + "; requests and sessions need a running instance");
+    }
+
+    /** A request on a session: refused unless RUNNING, counted while it runs (suspend waits for it). */
+    public <T> T request(Callable<T> call) throws EngineException {
+        inFlight.incrementAndGet();
+        try {
+            admit();
+            return within(call);
+        } finally {
+            inFlight.decrementAndGet();
+        }
     }
 
     /** Runs {@code call} with the engine's loader as the context loader; an EngineException passes, anything else is {@code ENG-9000}. */
@@ -99,26 +201,51 @@ public final class EngineInstance implements AutoCloseable {
         } catch (EngineException e) {
             throw e;
         } catch (Exception | LinkageError e) {
-            throw new EngineException("ENG-9000", Kind.FAILED, id + " failed", java.util.Map.of(), e);
+            throw new EngineException("ENG-9000", Kind.FAILED, id + " failed", Map.of(), e);
         } finally {
             t.setContextClassLoader(before);
         }
     }
 
-    /** Closes the instance (sessions are the caller's to close first); harmless twice. */
-    @Override
-    public synchronized void close() {
-        if (state == State.CLOSED) {
+    /** Any state to SHUTDOWN (sessions are the caller's to close first); harmless twice. */
+    public synchronized void shutdown() {
+        if (state == LifecycleState.SHUTDOWN) {
             return;
         }
-        state = State.CLOSED;
+        state = LifecycleState.SHUTDOWN;
+        reason = null;
         try {
             within(() -> {
-                engine.close();
+                engine.shutdown();
                 return null;
             });
         } catch (EngineException e) {
-            failure = "close failed";
+            failure = "shutdown failed";
+        }
+    }
+
+    /** Same as {@link #shutdown}. */
+    @Override
+    public void close() {
+        shutdown();
+    }
+
+    private void require(LifecycleState expected, String call) throws EngineException {
+        if (state != expected) {
+            throw new EngineException("ENG-5020", Kind.REFUSED, id + " is " + state + "; " + call + " needs " + expected);
+        }
+    }
+
+    private void drain(Duration grace) {
+        long end = System.nanoTime() + Math.max(grace == null ? 0 : grace.toNanos(), 1_000_000L);
+        while (inFlight.get() > 0 && System.nanoTime() < end) {
+            Thread.onSpinWait();
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
         }
     }
 }

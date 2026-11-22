@@ -151,17 +151,17 @@ public final class Main {
                 HostContext ctx = new HostContext(d, Params.options(d, new LinkedHashMap<>(options)), work, Clock.fixed(now, ZoneOffset.UTC), ex,
                         new Budget(Long.parseLong(one.getOrDefault("memory-mb", "1024")) << 20), Map.of(), s -> Optional.empty(), s -> inputs.stamps());
                 try (EngineInstance inst = new EngineInstance(d.id(), ej.create(r), ej.loader())) {
-                    inst.open(ctx);
+                    inst.boot(ctx);
                     Session session = inst.session(snap, inputs, HostControl.open());
                     try {
                         List<String> outputs = List.of(one.get("outputs").split(","));
                         Request req = new Request("cli", outputs, Params.request(d, outputs, new LinkedHashMap<>(params)),
                                 visibility(d, one.getOrDefault("visibility", "all")), "cli", 0, RequestClass.BATCH);
-                        Answer ans = inst.within(() -> session.ask(req, HostControl.open()));
+                        Answer ans = inst.request(() -> session.ask(req, HostControl.open()));
                         write(outDir, d, ans);
                         if (workbook && session instanceof Explaining x) {
                             try (OutputStream o = Files.newOutputStream(outDir.resolve(d.id() + ".xlsx"))) {
-                                inst.within(() -> {
+                                inst.request(() -> {
                                     x.workbook(req, o, HostControl.open());
                                     return null;
                                 });
@@ -169,7 +169,7 @@ public final class Main {
                         }
                         if (one.containsKey("explain") && session instanceof Explaining x) {
                             Cell cell = cell(one.get("explain"));
-                            Explanation e = inst.within(() -> x.explain(req, cell, HostControl.open()));
+                            Explanation e = inst.request(() -> x.explain(req, cell, HostControl.open()));
                             Files.writeString(outDir.resolve("explain.json"), Canonical.json(plain(e)) + "\n", StandardCharsets.UTF_8);
                         }
                         out.println(ans.status() + " " + ans.tables().stream().map(t -> t.schema().name() + " " + t.rows() + " rows").toList());

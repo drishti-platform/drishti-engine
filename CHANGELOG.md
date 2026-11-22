@@ -22,4 +22,8 @@ and the specification's draft 3 (`spec/1/SPEC.md`).
 - Rachana 1.0.0 (level 1.2) is the kit's EL oracle. Descriptors name their `product`; a host's `Licence` blocks an engine whose product
   it does not grant (`ENG-1014`, one sentence), beside the version check; the format of the licence file stays pluggable. The exact-path
   option is declared (`forces: exact-path`), and the kit's pushdown law reads the declaration. The specification copy here is amended.
+- Engine lifecycle (owner requirement): `Engine` has `init`, `start`, `suspend`, `resume` and `shutdown` (replacing `open` and `close`);
+  `LifecycleState` (`NEW`, `INITIALISED`, `RUNNING`, `SUSPENDED`, `FAILED`, `SHUTDOWN`); `EngineInstance` runs the sequence, gates requests
+  and sessions to `RUNNING`, drains or cancels calls in flight at suspend (`ENG-5023` "suspended" for new ones), shutdown in any state;
+  the kit's lifecycle law (`Lifecycle`) proves it; both sample engines implement it; specification 7.1 rewritten, `ENG-5023` added.
 - Guards, launchers per the platform launcher standard, README, LICENSE.

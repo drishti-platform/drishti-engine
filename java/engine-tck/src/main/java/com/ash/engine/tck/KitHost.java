@@ -209,7 +209,8 @@ public final class KitHost {
         Opened o = new Opened(this, c, v, engine, ctx, ex, work, rows, snapshot, bySnapshot);
         try {
             within(() -> {
-                engine.open(ctx);
+                engine.init(ctx);
+                engine.start();
                 return null;
             });
             o.session = within(() -> engine.session(snapshot, inputs, o.control()));
@@ -385,7 +386,7 @@ public final class KitHost {
                     if (session != null) {
                         session.close();
                     }
-                    engine.close();
+                    engine.shutdown();
                     return null;
                 });
             } catch (Exception e) {
