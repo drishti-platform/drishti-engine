@@ -59,7 +59,7 @@ public final class WmeanEngine implements Engine, Assembling {
     static final List<String> COLUMNS = List.of("ID", "GROUP", "VALUE", "WEIGHT");
 
     private volatile EngineContext context;
-    private volatile EngineMeter meter = new EngineMeter(java.time.Clock.systemUTC());
+    private volatile EngineMeter meter = EngineMeter.unstarted();
     private volatile LifecycleState lifecycle = LifecycleState.NEW;
     private volatile TableSchema schema;
 

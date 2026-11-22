@@ -87,8 +87,13 @@ public final class KitHost {
     /** A subject made from an engine class on the class path. */
     public static Subject of(Class<? extends Engine> type) {
         Descriptor d;
-        try (Engine e = type.getConstructor().newInstance()) {
-            d = e.descriptor();
+        try {
+            Engine e = type.getConstructor().newInstance();
+            try {
+                d = e.descriptor();
+            } finally {
+                e.shutdown();
+            }
         } catch (ReflectiveOperationException e) {
             throw new IllegalArgumentException(type.getName() + " needs a public constructor without parameters", e);
         }

@@ -289,11 +289,14 @@ public final class Laws {
         Descriptor.Partition part = d.partition();
         List<Map<String, Object>> rows = c.given().rows().get(part.input());
         TreeSet<String> values = new TreeSet<>();
-        if (rows != null) {
-            rows.forEach(r -> values.add(RowInputs.text(r.get(part.unit()))));
+        List<Map<String, Object>> all = new ArrayList<>(rows == null ? List.of() : rows);
+        all.addAll(overlayRows(c, part.input()));
+        for (Map<String, Object> r : all) {
+            String v = RowInputs.text(r.get(part.unit()));
+            if (v != null) {
+                values.add(v); // a TreeSet takes no null: a row without the unit belongs to no shard
+            }
         }
-        overlayRows(c, part.input()).forEach(r -> values.add(RowInputs.text(r.get(part.unit()))));
-        values.remove(null);
         try (KitHost.Opened o = host.open(c, KitHost.Variation.PLAIN)) {
             if (!(o.session() instanceof Partitioned ps) || !(o.engine() instanceof Assembling as)) {
                 return Result.fail("laws", c.name(), "additivity", "the capability partition is listed but the session is not Partitioned or the engine not Assembling");

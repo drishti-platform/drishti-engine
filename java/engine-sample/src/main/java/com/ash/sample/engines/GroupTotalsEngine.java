@@ -38,7 +38,7 @@ public final class GroupTotalsEngine implements Engine {
     static final String ID = "group-totals";
 
     private volatile EngineContext context;
-    private volatile EngineMeter meter = new EngineMeter(java.time.Clock.systemUTC());
+    private volatile EngineMeter meter = EngineMeter.unstarted();
     private volatile LifecycleState lifecycle = LifecycleState.NEW;
 
     @Override

@@ -32,7 +32,10 @@ import org.junit.jupiter.api.Test;
 class NamesNoHostTest {
 
     private static final Pattern HOST = Pattern.compile("com[./]ash[./]drishti|org[./]springframework|jakarta[./]servlet|javax[./]servlet|\\bdrishti\\.[a-z]");
-    private static final Set<String> EXEMPT = Set.of("java/engine-tck/src/main/java/com/ash/engine/tck/Delivery.java");
+    // Delivery: the kit's own list of host types it refuses. EngineFile: reads the engine file's root key drishti.engines.<id>, which the
+    // specification itself fixes (SPEC.md section 9), not a Drishti setting.
+    private static final Set<String> EXEMPT = Set.of("java/engine-tck/src/main/java/com/ash/engine/tck/Delivery.java",
+            "java/engine-host/src/main/java/com/ash/engine/host/EngineFile.java");
 
     @Test
     void noModuleNamesAHost() {

@@ -173,8 +173,13 @@ public final class EngineJar implements AutoCloseable {
             return;
         }
         Descriptor said;
-        try (Engine e = p.get()) {
-            said = e.descriptor();
+        try {
+            Engine e = p.get();
+            try {
+                said = e.descriptor();
+            } finally {
+                e.shutdown();
+            }
         } catch (RuntimeException | ServiceConfigurationError | LinkageError e) {
             engines.add(new Registered("?", "?", "?", type, null,
                     List.of(new Problem("ENG-1003", file + ": " + type.getSimpleName() + " cannot be created or does not give its descriptor: " + rootWords(e)))));

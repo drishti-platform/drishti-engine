@@ -72,7 +72,7 @@ public record Health(State state, List<String> reasons, Instant checkedAt) {
     public static Health of(LifecycleState lifecycle, Instant at) {
         return switch (lifecycle) {
             case RUNNING -> up(at);
-            case SUSPENDED -> suspended(at);
+            case SUSPENDED -> suspended(at, "suspended");
             case NEW -> down(at, "not initialised");
             case INITIALISED -> down(at, "not started");
             case FAILED -> down(at, "failed");

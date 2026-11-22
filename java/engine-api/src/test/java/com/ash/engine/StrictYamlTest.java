@@ -45,7 +45,7 @@ class StrictYamlTest {
         assertThat(m.get("a")).isEqualTo(1L);
         assertThat(m.get("b")).isEqualTo(1.5);
         assertThat(m.get("c")).isEqualTo("0x4031800000000000");
-        assertThat(((List<?>) m.get("d")).subList(0, 2)).containsExactly("x", 2L);
+        assertThat(List.<Object>copyOf(((List<?>) m.get("d")).subList(0, 2))).containsExactly("x", 2L);
         assertThat(((List<?>) m.get("d")).get(2)).isInstanceOf(Map.class);
         assertThat((List<?>) m.get("g")).hasSize(2);
         assertThat(((Map<?, ?>) ((List<?>) m.get("g")).get(0)).get("i")).isEqualTo("two");
@@ -74,7 +74,7 @@ class StrictYamlTest {
         Map<String, Object> m = StrictYaml.readMap("{\"a\":1,\"b\":\"x:y\",\"c\":[1.5,true,null],\"d\":{\"e\":\"\\u00e9\"}}");
         assertThat(m.get("a")).isEqualTo(1L);
         assertThat(m.get("b")).isEqualTo("x:y");
-        assertThat((List<?>) m.get("c")).containsExactly(1.5, true, null);
+        assertThat(new java.util.ArrayList<Object>((List<?>) m.get("c"))).containsExactly(1.5, true, null);
         assertThat(((Map<?, ?>) m.get("d")).get("e")).isEqualTo("\u00e9");
     }
 }

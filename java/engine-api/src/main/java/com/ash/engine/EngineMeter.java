@@ -51,6 +51,14 @@ public final class EngineMeter {
     private final AtomicInteger queue = new AtomicInteger();
     private volatile long lastActivityMillis = Long.MIN_VALUE;
 
+    /**
+     * A meter for an engine object before {@link Engine#init}: it reads a fixed clock at the epoch, so an engine never names a system
+     * clock (the kit's closed scan); {@code init} replaces it with one on the context's clock.
+     */
+    public static EngineMeter unstarted() {
+        return new EngineMeter(Clock.fixed(java.time.Instant.EPOCH, java.time.ZoneOffset.UTC));
+    }
+
     public EngineMeter(Clock clock) {
         this.clock = clock;
         for (int i = 0; i < SLOTS; i++) {

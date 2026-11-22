@@ -36,6 +36,7 @@ final class WmeanBook {
             Sheet data = wb.sheet("Data");
             data.row(1).text(0, "ID", "header").text(1, "GROUP", "header").text(2, "VALUE", "header").text(3, "WEIGHT", "header");
             int n = 0;
+            java.util.List<Double> products = new java.util.ArrayList<>();
             if (rows != null) {
                 for (int i = 0; i < rows.size(); i++) {
                     String g = rows.group[i];
@@ -43,13 +44,22 @@ final class WmeanBook {
                         continue;
                     }
                     data.next().text(0, rows.id[i], "normal").text(1, g, "normal").number(2, rows.value[i], "decimal").number(3, rows.weight[i], "decimal");
+                    products.add(rows.value[i] * rows.weight[i]);
                     n++;
                 }
             }
             int last = Math.max(2, n + 1);
             String grp = "Data!$B$2:$B$" + last;
-            String val = "Data!$C$2:$C$" + last;
             String wgt = "Data!$D$2:$D$" + last;
+            // VALUE x WEIGHT per observation, one formula per Data row: the conditional sums below stay plain SUMIFS (no array
+            // arithmetic, which Apache POI and older spreadsheet programs evaluate by implicit intersection)
+            Sheet work = wb.sheet("Work");
+            work.row(1).text(0, "VALUE x WEIGHT", "header").text(1, "ONE", "header");
+            for (int k = 2; k <= n + 1; k++) {
+                work.row(k).formula(0, "Data!C" + k + "*Data!D" + k, products.get(k - 2), "decimal").number(1, 1, "int");
+            }
+            String vw = "Work!$A$2:$A$" + last;
+            String one = "Work!$B$2:$B$" + last;
             Sheet main = wb.sheet("Main");
             main.row(1).text(0, "Minimum weight", "bold").number(1, min, "decimal");
             main.row(3).text(0, "GROUP", "header").text(1, "COUNT", "header").text(2, "WEIGHT", "header").text(3, "MEAN", "header");
@@ -58,9 +68,9 @@ final class WmeanBook {
                 r++;
                 String a = "A" + r;
                 main.row(r).text(0, answer.texts("GROUP")[i], "normal")
-                        .formula(1, "SUMPRODUCT((" + grp + "=" + a + ")*(" + wgt + ">=$B$1))", (double) answer.integers("COUNT")[i], "int")
+                        .formula(1, "SUMIFS(" + one + "," + grp + "," + a + "," + wgt + ",\">=\"&$B$1)", (double) answer.integers("COUNT")[i], "int")
                         .formula(2, "SUMIFS(" + wgt + "," + grp + "," + a + "," + wgt + ",\">=\"&$B$1)", answer.numbers("WEIGHT")[i], "decimal")
-                        .formula(3, "SUMPRODUCT((" + grp + "=" + a + ")*(" + wgt + ">=$B$1)*" + val + "*" + wgt + ")/C" + r, answer.numbers("MEAN")[i], "decimal");
+                        .formula(3, "SUMIFS(" + vw + "," + grp + "," + a + "," + wgt + ",\">=\"&$B$1)/C" + r, answer.numbers("MEAN")[i], "decimal");
             }
             if (answer != null && answer.rows() > 0) {
                 wb.name("OUT_MEAN_BY_GROUP_MEAN", main.name(), "$D$4");
