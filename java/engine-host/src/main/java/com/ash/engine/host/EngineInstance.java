@@ -253,7 +253,7 @@ public final class EngineInstance implements AutoCloseable {
         } catch (EngineException e) {
             throw e;
         } catch (Exception | LinkageError e) {
-            throw new EngineException("ENG-9000", Kind.FAILED, id + " failed", Map.of(), e);
+            throw new EngineException("ENG-9000", Kind.FAILED, id + " failed: " + e, Map.of(), e);
         } finally {
             t.setContextClassLoader(before);
         }
