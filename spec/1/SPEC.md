@@ -924,7 +924,7 @@ Normative for Drishti; another host MAY use the same schema.
 | `engine.run` | | `in-process` (default) or `process` |
 | `engine.allow-uncertified` | | **DELETED** (draft 2): a certificate is required only under trust `pinned` (17.6) |
 | `snapshot` | | `hot` (sessions kept open), `pinned`, `idle-close` |
-| `inputs.<name>` | | binding left open by contracts (10.2): `kinds: [..]` or `table: <lake table>`; `columns: { <contract column>: <table column> }`; `where:` one Rachana-EL expression over a row (`@.`), hermetic |
+| `inputs.<name>` | | binding left open by contracts (10.2): `kinds: [..]` or `table: <lake table>`; `columns: { <contract column>: <table column> }`; `where:` one Rachana-EL expression over a row (`@.`), hermetic; `as-of: date` (the default: the snapshot date's rows) or `on-or-before` (each record's latest version on or before the date: a reference kind loaded once, not every day); `field: <list field>` (the input's rows are the items of each record's list-of-records field, the record's own columns beside them) |
 | `options` | | the engine's options; checked against the descriptor |
 | `triggers` | | list (9.3); default `[ { on: request } ]` |
 | `asks.<name>` | | a named request for triggers: `{ outputs, params, snapshot, as }` |

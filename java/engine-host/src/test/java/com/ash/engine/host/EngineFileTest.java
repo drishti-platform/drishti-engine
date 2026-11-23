@@ -80,4 +80,17 @@ class EngineFileTest {
         EngineFile f = EngineFile.read("calc", t);
         assertThat(f.check(D)).isEmpty();
     }
+
+    @Test
+    void anInputIsReadOnOrBeforeTheDateOrFromAListFieldWhenTheFileSaysSo() throws Exception {
+        EngineFile f = EngineFile.read("calc", FILE.replace("options: { scale: 2 }",
+                "options: { scale: 2 }\n      inputs:\n        rows: { kinds: [ limit ], as-of: on-or-before, field: BUCKETS }"));
+        EngineFile.Binding b = f.inputs().get("rows");
+        assertThat(b.onOrBefore()).isTrue();
+        assertThat(b.field()).isEqualTo("BUCKETS");
+        assertThat(EngineFile.read("calc", FILE.replace("options: { scale: 2 }",
+                "options: { scale: 2 }\n      inputs:\n        rows: { kinds: [ limit ] }")).inputs().get("rows").asOf()).isEqualTo("date");
+        assertThatThrownBy(() -> EngineFile.read("calc", FILE.replace("options: { scale: 2 }",
+                "options: { scale: 2 }\n      inputs:\n        rows: { kinds: [ limit ], as-of: latest }"))).hasMessageContaining("on-or-before");
+    }
 }

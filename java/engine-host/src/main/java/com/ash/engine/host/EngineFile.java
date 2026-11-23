@@ -42,7 +42,25 @@ public record EngineFile(String id, boolean enabled, Map<String, Object> changed
     public record SnapshotPolicy(int hot, String idleClose, Map<String, Object> pinned) {}
 
     /** What binding by contract leaves open: kinds or a table, a column map (contract column to table column), a row filter in Rachana-EL. */
-    public record Binding(List<String> kinds, String table, Map<String, String> columns, String where) {}
+    public record Binding(List<String> kinds, String table, Map<String, String> columns, String where, String asOf, String field) {
+
+        /** How a dated read finds a date's rows: {@code date} (that date's rows only) or {@code on-or-before} (each record's latest version on or before it). */
+        public static final List<String> AS_OF = List.of("date", "on-or-before");
+
+        public Binding {
+            asOf = asOf == null ? "date" : asOf;
+        }
+
+        /** A binding read on its date, its records whole. */
+        public Binding(List<String> kinds, String table, Map<String, String> columns, String where) {
+            this(kinds, table, columns, where, "date", null);
+        }
+
+        /** True when each record's latest version on or before the date is read (a reference kind loaded once, not every day). */
+        public boolean onOrBefore() {
+            return "on-or-before".equals(asOf);
+        }
+    }
 
     /** One trigger: {@code request}, {@code schedule}, {@code data-version}, {@code changes} or {@code after}, with its keys. */
     public record Trigger(String on, String cron, String zone, String every, String input, List<String> inputs, String from, String engine,
@@ -122,7 +140,7 @@ public record EngineFile(String id, boolean enabled, Map<String, Object> changed
             for (Map.Entry<String, Object> e : map(id, "inputs", m.get("inputs")).entrySet()) {
                 String w = "inputs." + e.getKey();
                 Map<String, Object> b = map(id, w, e.getValue());
-                keys(id, w, b, Set.of("kinds", "table", "columns", "where"));
+                keys(id, w, b, Set.of("kinds", "table", "columns", "where", "as-of", "field"));
                 if (b.containsKey("kinds") && b.containsKey("table")) {
                     throw bad(id, w, "kinds or table, not both");
                 }
@@ -130,8 +148,12 @@ public record EngineFile(String id, boolean enabled, Map<String, Object> changed
                 if (b.get("columns") != null) {
                     map(id, w + ".columns", b.get("columns")).forEach((k, x) -> cols.put(k, String.valueOf(x)));
                 }
+                String asOf = text(id, w + ".as-of", b.get("as-of"));
+                if (asOf != null && !Binding.AS_OF.contains(asOf)) {
+                    throw bad(id, w + ".as-of", "date or on-or-before");
+                }
                 inputs.put(e.getKey(), new Binding(texts(id, w + ".kinds", b.get("kinds")), text(id, w + ".table", b.get("table")),
-                        Collections.unmodifiableMap(cols), text(id, w + ".where", b.get("where"))));
+                        Collections.unmodifiableMap(cols), text(id, w + ".where", b.get("where")), asOf, text(id, w + ".field", b.get("field"))));
             }
         }
         List<Trigger> triggers = new ArrayList<>();
