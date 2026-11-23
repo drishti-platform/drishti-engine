@@ -434,6 +434,9 @@ public final class RowInputs implements Inputs {
         @Override
         public String[] texts(String c) {
             known(c);
+            if (arrays.get(c + "#t") instanceof String[] done) {
+                return done;                                   // built once per batch: a caller may ask per row
+            }
             String[] a = reuse.get(c + "#t") instanceof String[] s ? s : new String[capacity];
             for (int i = 0; i < n; i++) {
                 Object v = rows.get(i).get(c);
@@ -449,6 +452,9 @@ public final class RowInputs implements Inputs {
         @Override
         public long[] integers(String c) {
             known(c);
+            if (arrays.get(c + "#i") instanceof long[] done) {
+                return done;                                   // built once per batch: a caller may ask per row
+            }
             long[] a = reuse.get(c + "#i") instanceof long[] l ? l : new long[capacity];
             for (int i = 0; i < n; i++) {
                 Object v = rows.get(i).get(c);
@@ -469,6 +475,9 @@ public final class RowInputs implements Inputs {
         @Override
         public double[] numbers(String c) {
             known(c);
+            if (arrays.get(c + "#n") instanceof double[] done) {
+                return done;                                   // built once per batch: a caller may ask per row
+            }
             double[] a = reuse.get(c + "#n") instanceof double[] d ? d : new double[capacity];
             for (int i = 0; i < n; i++) {
                 Object v = rows.get(i).get(c);
