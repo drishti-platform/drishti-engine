@@ -110,6 +110,7 @@ public final class Cases {
         Map<String, Object> shared = doc.get("given") == null ? Map.of() : map(where + " given", doc.get("given"));
         List<Case> out = new ArrayList<>();
         Set<String> ids = new TreeSet<>();
+        Map<Path, List<Map<String, Object>>> files = new java.util.HashMap<>();   // a file the cases share is read once per case file
         for (Object o : (List<Object>) doc.get("cases")) {
             Map<String, Object> c = map(where + " case", o);
             String id = String.valueOf(c.get("id"));
@@ -129,7 +130,7 @@ public final class Cases {
                 throw new IllegalArgumentException(w + ": expect has exactly one of status and refused");
             }
             out.add(new Case(suite, engine, since, id, c.get("source") == null ? null : String.valueOf(c.get("source")),
-                    Boolean.TRUE.equals(c.get("reference")), given(w, g), ask, expect,
+                    Boolean.TRUE.equals(c.get("reference")), given(w, g, file, files), ask, expect,
                     c.get("explain") == null ? null : (List<Map<String, Object>>) c.get("explain"),
                     c.get("changes") == null ? List.of() : (List<Map<String, Object>>) c.get("changes"), laws(w, c.get("laws")), file));
         }
@@ -137,7 +138,7 @@ public final class Cases {
     }
 
     @SuppressWarnings("unchecked")
-    private static Given given(String w, Map<String, Object> g) {
+    private static Given given(String w, Map<String, Object> g, Path caseFile, Map<Path, List<Map<String, Object>>> files) {
         keys(w + " given", g, Set.of("snapshot", "options", "inputs", "suppliers"));
         Map<String, String> snapshot = new TreeMap<>();
         if (g.get("snapshot") != null) {
@@ -158,7 +159,18 @@ public final class Cases {
                     map(w + " tables", in.get("tables")).forEach((t, tv) -> ts.put(t, (List<Map<String, Object>>) map(w + " " + t, tv).get("rows")));
                     open.put(name, ts);
                 } else if (in.containsKey("file")) {
-                    throw new IllegalArgumentException(w + " inputs." + name + ": file: is read by kit 0.2; give rows: here");
+                    // a JSONL file (gzip when it ends in .gz), relative to the case file: the recorder's inputs (tck/data)
+                    if (caseFile == null) {
+                        throw new IllegalArgumentException(w + " inputs." + name + ": file: needs a case file to be relative to");
+                    }
+                    Path f = caseFile.toAbsolutePath().getParent().resolve(String.valueOf(in.get("file"))).normalize();
+                    rows.put(name, files.computeIfAbsent(f, x -> {
+                        try {
+                            return List.copyOf(com.ash.engine.inputs.JsonlFiles.rows(x, Map.of()));
+                        } catch (java.io.IOException e) {
+                            throw new IllegalArgumentException(w + " inputs." + name + ": " + e.getMessage(), e);
+                        }
+                    }));
                 } else {
                     rows.put(name, in.get("rows") == null ? List.of() : List.copyOf((List<Map<String, Object>>) in.get("rows")));
                 }

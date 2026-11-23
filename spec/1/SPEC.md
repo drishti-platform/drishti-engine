@@ -15,7 +15,7 @@
 -->
 # The Drishti engine specification, `engine: 1`
 
-**Status: draft 3, amended 2026-11-22 in the drishti-engine repository (this copy is now the one that changes): `product` and the licence check (6.2, 17.8, `ENG-1014`), and the exact-path option declared by `forces: exact-path` (6.4 rule 9). The kit and the API of 0.1 implement it; the copy in Drishti's `docs/specs/` is superseded by this one.** Draft 2 put the owner's acceptance test into the text: an engine is
+**Status: draft 4 (sections 18 and 19: zero copy, the computation contract, declared functions; EN-56 to EN-74). Draft 3, amended 2026-11-22 in the drishti-engine repository (this copy is now the one that changes): `product` and the licence check (6.2, 17.8, `ENG-1014`), and the exact-path option declared by `forces: exact-path` (6.4 rule 9). The kit and the API of 0.1 implement it; the copy in Drishti's `docs/specs/` is superseded by this one.** Draft 2 put the owner's acceptance test into the text: an engine is
 built and proven with no host, delivered as one JAR, found by `ServiceLoader`, checked for compatibility and refused in words
 (section 17). Draft 3 widens the scope to every computation (the owner's direction of the same day): query, live, what-if and
 explain run on the same two interfaces, with the declarations and host methods of sections 2.1, 3.2, 5 and 8.8 added and no
@@ -42,7 +42,9 @@ files beside it.
 11. [Errors](#11-errors) · 12. [The kit](#12-the-kit) · 13. [Versioning](#13-versioning) ·
 14. [The process binding](#14-the-process-binding) · 15. [Generated artefacts](#15-generated-artefacts) ·
 16. [A worked example](#16-a-worked-example) ·
-17. [Delivery](#17-delivery-the-engine-jar-discovery-class-loading-compatibility)
+17. [Delivery](#17-delivery-the-engine-jar-discovery-class-loading-compatibility) ·
+18. [Zero-copy data access](#18-zero-copy-data-access-draft-4-drishti-engine_integration_design-section-17-en-56-to-en-65-accepted-2026-11-22) ·
+19. [The computation contract](#19-the-computation-contract-draft-4-drishti-engine_integration_design-section-18-en-66-to-en-74-accepted-2026-11-22)
 
 ## 0. Conventions
 
@@ -1769,3 +1771,50 @@ product the licence does not grant is `blocked` (`ENG-1014`) with one sentence t
 missing product, and nothing else is affected. The licence file's form and signing are designed with module licensing, so modules and
 engines share one licence file; until then a host plugs its reader in behind `com.ash.engine.host.Licence`, and the kit and the
 command line grant every product.
+
+## 18. Zero-copy data access (draft 4; Drishti ENGINE_INTEGRATION_DESIGN section 17, EN-56 to EN-65, accepted 2026-11-22)
+
+Normative. Where this section and an earlier one differ, this one wins and the earlier text is amended at the API step.
+
+1. **Bulk data exists once, in memory the host owns.** Columns, P&L vectors, node aggregates and large results are read in place by
+   every engine, session and caller. An engine MUST NOT map a file, allocate direct memory or reach for `Unsafe` (the kit's static scan).
+2. **Leases.** An engine holds views only under a `Lease` (a request lease per `ask`, a session lease per snapshot version). A view used
+   after its lease ends MUST refuse ("unloaded, ask again"), never crash; a host releases only what is unleased.
+3. **View types** (`com.ash.engine`, JDK only, Java 21, read-only `java.nio` buffers, little-endian): `Lease`, `RowSet` (row ordinals as
+   runs or a bitmap), `Columns` (a piece of a table's scalar columns: `DoubleBuffer`, `LongBuffer`, dictionary-coded text, bitmaps),
+   `FloatVectors` and `DoubleVectors` (fixed-width rows, `row(i)`, `value(i, j)`, `addInto(acc, rows)`), `TableWriter` (a host buffer for
+   one large output). They replace the array `Batch` and the `VectorSink` (one handover, one way). Nothing is widened on the way: a sum
+   reads float32 rows into a float64 accumulator in the store's row order.
+4. **Framing.** View buffers are laid out as Arrow lays them out; files gain an Arrow IPC header and footer written by the host with the
+   official Arrow library. `engine-api` names no Arrow type.
+5. **Results.** Small answers are values (`Tables`); a large one is written once into a `TableWriter` the host provides and seals.
+6. **Access.** The host resolves row rules and scope to a `RowSet`; masked columns are absent from the caller's `Columns`. No copy and no
+   book per visibility.
+7. **The kit's zero-copy group**: allocation per call, backing identity, poison after a lease, the heap ceiling at size, the static scan.
+
+## 19. The computation contract (draft 4; Drishti ENGINE_INTEGRATION_DESIGN section 18, EN-66 to EN-74, accepted 2026-11-22)
+
+1. **Scope is the host's.** Every scope kind (node, basket, expression, ad-hoc or personal set, a position) reaches the engine as a
+   `RowSet`; the engine never sees the kind or the expression.
+2. **The mergeable aggregate.** `aggregate(view, rows, groups)` gives a partial per group (the group's summed vector in float64, keyed by
+   its place in the canonical order); `merge(partials)` gives the aggregate and refuses partials that do not belong together.
+   `Partitioned.partial` is `aggregate` over a shard, `Assembling.assemble` is `merge` then the measures, `Incremental.apply` merges the
+   changed units into the kept aggregate. Path, tree, matrix, compare, what-if, sharding and intraday are uses of the two.
+3. **Measures are functions of an aggregate** (VaR, ES, parametric, stressed, 10-day, component, marginal, incremental, correlation,
+   beta; exposure with time buckets, the netting set as the group), each declared in the descriptor with its explanation.
+4. **One reduction order** (bits): rows ascending from zero inside a block on the absolute ordinal grid, the block size from the row
+   set's size alone; block partials in block order; a parent from its children in id order; a plan a function of the row set and the
+   version only. `merge` reproduces the single-pass bits whenever each unit was summed whole by one party. A unit split between parties
+   chains the open block's accumulator or is summed again from rows; a folded vector is never extended by a delta.
+5. **Captures, history, alerts, limits, approvals and live tables are the host's** (stored outputs, re-asks); the MR cube and BI are
+   the `query` engine over the same contract.
+6. **Laws the kit proves**: scope-kind blindness, grouping, merge order, split anywhere (through the chain inside a unit), incremental at
+   unit grain.
+7. **Declared engine functions (EN-66).** A public method of the engine's session class marked `@EngineFunction(name, version,
+   description)` with parameters among `RowSet`, `FloatVectors`, `DoubleVectors`, `Columns` and plain values, and a plain value, a
+   `Table` or a `TableWriter` as result; optionally mergeable with a method marked `@EngineFunction.Merge`. A host MUST: (a) at JAR load
+   **scan the engine's registered classes for `@EngineFunction`**; (b) read the **function index an annotation processor of
+   `engine-api` writes into the JAR** (`META-INF/drishti-engine/functions.idx`) first and verify it against the real annotations, a
+   mismatch turning that one function off in words; (c) **list every discovered function automatically** (its administration screen,
+   the generated API documents, the tool list an agent reads) and keep it **off until an administrator or the engine file enables and
+   maps it**. Every call goes through the host's access, licence and audit; the kit checks types, zero copy, version and the merge laws.
