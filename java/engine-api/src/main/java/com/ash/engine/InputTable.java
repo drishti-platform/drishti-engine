@@ -40,6 +40,22 @@ public interface InputTable {
     /** One vector column with some text columns, a row at a time, in a stable order. */
     void vectors(VectorScan scan, VectorSink sink) throws EngineException;
 
+    /**
+     * The vector column {@code column} as a view (specification 18.3): row {@code i} is the input's row {@code i} in {@link #scan} order,
+     * the rows the session may see. A host that holds float32 rows returns a {@link FloatVectors}, float64 a {@link DoubleVectors} (the
+     * width the store holds; nothing widened). The default reads {@link #vectors} once into a heap view, for hosts that hold no view yet.
+     */
+    default Object vectorView(String column) throws EngineException {
+        java.util.List<double[]> rows = new java.util.ArrayList<>();
+        int[] width = {0};
+        vectors(new VectorScan(column, java.util.List.of(), Filter.ALL), (id, values, length, texts) -> {
+            double[] r = length < 0 ? new double[0] : java.util.Arrays.copyOf(values, length);
+            width[0] = Math.max(width[0], r.length);
+            rows.add(r);
+        });
+        return VectorViews.heap(rows, width[0]);
+    }
+
     /** Push-down. true: the source can answer this grouped scan exactly; then {@link #groups} MAY be called. Cheap. */
     boolean offers(GroupScan scan);
 

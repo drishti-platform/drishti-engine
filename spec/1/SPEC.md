@@ -1140,6 +1140,7 @@ public final class EngineException extends Exception {
 | `ENG-5020` | REFUSED | a call in a state that does not allow it (section 7) |
 | `ENG-5021` | REFUSED | partials that do not belong together |
 | `ENG-5023` | REFUSED | the engine is suspended (the words say "suspended" and why) |
+| `ENG-5024` | REFUSED | a view read after its lease ended: the version was unloaded while the answer was computed; ask again (18.2) |
 | `ENG-5030` | UNAVAILABLE | the engine is not installed on this server |
 | `ENG-5031` | UNAVAILABLE | the engine is off (who, when, why) |
 | `ENG-5032` | UNAVAILABLE | the engine is blocked (the start check that failed) |
